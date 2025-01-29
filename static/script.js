@@ -318,23 +318,32 @@ document.addEventListener('DOMContentLoaded', function() {
     loadURLs();
 });
 
-function showNotification(urlData, isRemote) {
+function showNotification(message, type = 'info') {
     const container = document.getElementById('notification-container');
     const notification = document.createElement('div');
-    notification.className = 'notification';
+    notification.className = `notification ${type}`;
     
-    const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(urlData.url).hostname}`;
-    const hostname = new URL(urlData.url).hostname;
-    
-    notification.innerHTML = `
-        <img src="${faviconUrl}" class="favicon" alt="favicon">
-        You bookmarked <strong>${hostname}</strong>
-        ${urlData.category ? `in ${urlData.category}` : ''}
-    `;
+    // Handle both string messages and URL data objects
+    if (typeof message === 'string') {
+        notification.textContent = message;
+    } else {
+        try {
+            const urlObj = new URL(message.url);
+            const faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}`;
+            
+            notification.innerHTML = `
+                <img src="${faviconUrl}" class="favicon" alt="favicon">
+                You bookmarked <strong>${urlObj.hostname}</strong>
+                ${message.category ? `in ${message.category}` : ''}
+            `;
+        } catch (e) {
+            // Fallback for invalid URLs or error messages
+            notification.textContent = message.category || message.url;
+        }
+    }
     
     container.appendChild(notification);
     
-    // Remove notification after animation ends (5 seconds)
     setTimeout(() => {
         notification.remove();
     }, 5000);
@@ -359,40 +368,24 @@ function deleteURL(url) {
     showNotification('URL deleted successfully!');
 }
 
-// Function to sync with Excel file
+// Modified sync function to use local storage only (removing Excel sync)
 async function syncWithExcel() {
     try {
         const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
         
-        // Send data to Netlify function
-        const response = await fetch('/.netlify/functions/sync-excel', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                bookmarks: bookmarks,
-                timestamp: new Date().toISOString()
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Sync failed');
-        }
-
-        // Get latest data from server
-        const latestData = await fetch('/.netlify/functions/get-excel-data');
-        const jsonData = await latestData.json();
-        
-        // Update local storage with server data
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(jsonData.bookmarks));
+        // Instead of syncing with Excel, we'll just ensure local storage is up to date
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
         
         // Update UI
         loadURLs();
-        updatePinnedLinks(jsonData.bookmarks);
+        updatePinnedLinks(bookmarks);
+        
+        // Show success notification
+        showNotification('Bookmarks synchronized successfully', 'success');
         
     } catch (error) {
         console.error('Sync error:', error);
+        showNotification('Failed to sync bookmarks', 'error');
     }
 }
 
@@ -407,72 +400,43 @@ function generateToken() {
     const token = 'TMD_' + Math.random().toString(36).substring(2, 15) + 
                  Math.random().toString(36).substring(2, 15);
     
+    // Save current data with the new token
     const currentData = localStorage.getItem(STORAGE_KEY);
     if (currentData) {
         localStorage.setItem(TOKEN_STORAGE_PREFIX + token, currentData);
     }
     
-    // Create token display modal
-    const modalHtml = `
-        <div class="token-modal">
-            <h3>Your Sync Token</h3>
-            <div class="token-display">
-                <input type="text" value="${token}" id="tokenDisplay" readonly>
-                <button onclick="copyToken()" class="copy-button">Copy</button>
-            </div>
-            <p class="token-info">Save this token to sync your bookmarks across devices</p>
-        </div>
-    `;
+    // Show token to user
+    showNotification({
+        url: token,
+        category: 'Copy this token to sync your data across devices'
+    });
     
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
     localStorage.setItem(TOKEN_KEY, token);
     return token;
 }
 
-function copyToken() {
-    const tokenDisplay = document.getElementById('tokenDisplay');
-    tokenDisplay.select();
-    document.execCommand('copy');
-    
-    const copyButton = document.querySelector('.copy-button');
-    copyButton.textContent = 'Copied!';
-    setTimeout(() => {
-        copyButton.textContent = 'Copy';
-        document.querySelector('.token-modal').remove();
-    }, 2000);
-}
-
 // Sync data using a token
-async function syncWithToken() {
+function syncWithToken() {
     const inputToken = document.getElementById('token-input').value;
     if (!inputToken) {
-        showNotification({
-            url: 'Error',
-            category: 'Please enter a sync token'
-        });
+        showNotification('Please enter a sync token', 'error');
         return;
     }
 
     try {
-        // Update local storage key to use token-specific storage
         const newStorageKey = TOKEN_STORAGE_PREFIX + inputToken;
         localStorage.setItem(TOKEN_KEY, inputToken);
         localStorage.setItem(STORAGE_KEY, localStorage.getItem(newStorageKey) || '[]');
         
         // Update UI
         loadURLs();
-        showNotification({
-            url: 'Success',
-            category: 'Data synced successfully'
-        });
+        showNotification('Data synced successfully', 'success');
         
         // Clear input
         document.getElementById('token-input').value = '';
         
     } catch (error) {
-        showNotification({
-            url: 'Error',
-            category: 'Failed to sync data'
-        });
+        showNotification('Failed to sync data', 'error');
     }
 } 
