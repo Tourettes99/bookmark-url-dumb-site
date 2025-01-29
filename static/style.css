@@ -241,16 +241,21 @@ button:hover {
     gap: 10px;
 }
 
-.notification[data-remote="true"] {
+.notification {
     background-color: #111;
     border: 1px solid var(--orange);
     border-radius: 8px;
     padding: 15px;
     color: var(--text-gray);
     width: 300px;
-    animation: slideIn 0.3s ease-out, fadeOut 0.5s ease-in 4.5s;
-    opacity: 0;
-    transform: translateX(100%);
+    margin-bottom: 10px;
+    animation: slideIn 0.3s ease-out, fadeOut 0.5s ease-in 4.5s forwards;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.notification[data-remote="true"] {
     border-color: #4CAF50;
     background-color: rgba(76, 175, 80, 0.1);
 }
@@ -258,8 +263,6 @@ button:hover {
 .notification .favicon {
     width: 16px;
     height: 16px;
-    margin-right: 10px;
-    vertical-align: middle;
 }
 
 @keyframes slideIn {

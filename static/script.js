@@ -53,17 +53,21 @@ channel.bind('new-bookmark', function(data) {
 
 // Update addURL function
 function addURL(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
+    
     const urlInput = document.getElementById('url-input');
     const categoryInput = document.getElementById('category-input');
     const hashtagsInput = document.getElementById('hashtags-input');
     
+    if (!urlInput.value) return;
+
     const urlData = {
         url: urlInput.value,
         category: categoryInput.value,
-        hashtags: hashtagsInput.value,
+        hashtags: hashtagsInput.value.split(',').map(tag => tag.trim()),
         timestamp: new Date().getTime(),
-        userId: getCurrentUserId()
+        userId: getCurrentUserId(),
+        pinned: false
     };
 
     // Save to localStorage
@@ -71,24 +75,21 @@ function addURL(event) {
     urls.push(urlData);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
 
-    // Trigger Pusher event through Netlify function
-    fetch('/.netlify/functions/trigger-notification', {
-        method: 'POST',
-        body: JSON.stringify(urlData),
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    });
-
-    // Show local notification
+    // Show notification
     showNotification(urlData, false);
     
-    // Reset form
-    urlInput.value = '';
-    categoryInput.value = '';
-    hashtagsInput.value = '';
+    // Clear inputs
+    clearInputs();
     
+    // Reload URLs
     loadURLs();
+
+    // Send to WebSocket
+    socket.send(JSON.stringify({
+        type: 'new_bookmark',
+        userId: getCurrentUserId(),
+        data: urlData
+    }));
 }
 
 function clearInputs() {
@@ -108,36 +109,42 @@ function displayURLs(urls) {
     container.innerHTML = '';
 
     urls.forEach(url => {
-        const card = createURLCard(url);
+        const card = createURLElement(url);
         container.appendChild(card);
     });
 }
 
-function createURLCard(urlData) {
-    const card = document.createElement('div');
-    card.className = 'url-card';
+function createURLElement(urlData) {
+    const div = document.createElement('div');
+    div.className = 'url-card';
     
-    // Get favicon URL
-    const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(urlData.url).hostname}`;
+    const url = new URL(urlData.url);
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${url.hostname}`;
     
-    // Split hashtags into array
-    const hashtags = urlData.hashtags.split(',').map(tag => tag.trim()).filter(tag => tag);
+    const hashtags = Array.isArray(urlData.hashtags) 
+        ? urlData.hashtags 
+        : urlData.hashtags.split(',').map(tag => tag.trim());
     
-    card.innerHTML = `
-        <button class="pin-button" onclick="togglePin('${urlData.url}')">
-            ${urlData.pinned ? '📌' : '📍'}
-        </button>
-        <a href="${urlData.url}" target="_blank">
+    const hashtagsHtml = hashtags
+        .filter(tag => tag)
+        .map(tag => `<span class="hashtag">#${tag}</span>`)
+        .join('');
+    
+    div.innerHTML = `
+        <div class="url-title">
             <img src="${faviconUrl}" class="favicon" alt="favicon">
-            <span class="url-title">${urlData.url}</span>
-        </a>
-        <div class="category">${urlData.category}</div>
+            <a href="${urlData.url}" target="_blank">${url.hostname}</a>
+            <button class="pin-button" onclick="togglePin('${urlData.url}')">
+                ${urlData.pinned ? '📌' : '📍'}
+            </button>
+        </div>
+        ${urlData.category ? `<div class="category">${urlData.category}</div>` : ''}
         <div class="hashtags">
-            ${hashtags.map(tag => `<span class="hashtag">#${tag}</span>`).join('')}
+            ${hashtagsHtml}
         </div>
     `;
     
-    return card;
+    return div;
 }
 
 function updatePinnedLinks(urls) {
@@ -173,13 +180,12 @@ function updatePinnedLinks(urls) {
 
 function togglePin(url) {
     const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    const urlIndex = urls.findIndex(u => u.url === url);
+    const urlIndex = urls.findIndex(item => item.url === url);
     
     if (urlIndex !== -1) {
         urls[urlIndex].pinned = !urls[urlIndex].pinned;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
-        displayURLs(urls);
-        updatePinnedLinks(urls);
+        loadURLs();
     }
 }
 
