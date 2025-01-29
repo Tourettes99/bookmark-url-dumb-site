@@ -87,7 +87,10 @@
         <div class="token-section">
             <button onclick="generateToken()" class="token-button">Generate Sync Token</button>
             <input type="text" id="token-input" placeholder="Enter sync token">
-            <button onclick="syncWithToken()" class="token-button">Sync Data</button>
+            <div class="token-actions">
+                <button onclick="syncWithToken()" class="token-button">Save Data</button>
+                <button onclick="refreshCurrentToken()" class="token-button refresh-token-btn">🔄 Refresh</button>
+            </div>
         </div>
 
         <div class="add-url-form">
