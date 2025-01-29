@@ -270,28 +270,62 @@ function addURL() {
 // Sync changes to other devices
 async function syncChanges(token, bookmarks) {
     try {
+        // Add timeout to prevent hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
         const response = await fetch('/.netlify/functions/sync-bookmarks', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
             },
             body: JSON.stringify({
                 token: token,
                 bookmarks: bookmarks,
-                source: 'browser'
-            })
+                source: getDeviceId(),
+                timestamp: Date.now()
+            }),
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
+        
+        // Verify the response data
+        if (!data || data.error) {
+            throw new Error(data?.error || 'Invalid response from server');
+        }
+
+        // Update local storage after successful sync
+        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(bookmarks));
+        
         return data;
     } catch (error) {
-        console.error('Sync error:', error);
-        showNotification('Failed to sync - please check your connection', 'error');
-        throw error; // Re-throw to maintain existing error handling
+        // More specific error handling
+        if (error.name === 'AbortError') {
+            showNotification('Sync timeout - please try again', 'error');
+        } else if (!navigator.onLine) {
+            showNotification('No internet connection - will retry when online', 'warning');
+            // Add to retry queue when back online
+            window.addEventListener('online', () => syncChanges(token, bookmarks), { once: true });
+        } else {
+            showNotification('Sync failed - please check your connection', 'error');
+        }
+        
+        console.error('Detailed sync error:', {
+            error: error.message,
+            stack: error.stack,
+            token: token ? 'exists' : 'missing',
+            bookmarksCount: bookmarks?.length || 0
+        });
+        
+        throw error;
     }
 }
 
