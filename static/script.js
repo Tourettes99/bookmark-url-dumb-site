@@ -89,15 +89,28 @@ async function initializePusher() {
 }
 
 function setupSyncForToken(token) {
+    // Check if pusher is initialized
+    if (!window.pusher) {
+        console.warn('Pusher not initialized, initializing now...');
+        initializePusher().then(() => {
+            setupSyncChannel(token);
+        });
+    } else {
+        setupSyncChannel(token);
+    }
+}
+
+// New helper function to handle channel setup
+function setupSyncChannel(token) {
     // Unsubscribe from any existing channel
     if (window.currentChannel) {
-        pusher.unsubscribe(window.currentChannel);
+        window.pusher.unsubscribe(window.currentChannel);
     }
     
     const channelName = `sync-channel-${token}`;
     window.currentChannel = channelName;
     
-    const channel = pusher.subscribe(channelName);
+    const channel = window.pusher.subscribe(channelName);
     
     channel.bind('sync-update', function(data) {
         if (data.source !== getDeviceId()) {
