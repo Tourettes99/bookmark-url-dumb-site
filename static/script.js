@@ -22,34 +22,59 @@ socket.onclose = () => {
     console.log('Disconnected from WebSocket server');
 };
 
-function addURL() {
-    const url = document.getElementById('url-input').value;
-    const category = document.getElementById('category-input').value;
-    const hashtags = document.getElementById('hashtags-input').value;
+// Add this near the top of the file
+const pusher = new Pusher('YOUR_PUSHER_KEY', {
+  cluster: 'YOUR_CLUSTER'
+});
 
-    const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY));
+const channel = pusher.subscribe('bookmarks-channel');
+channel.bind('new-bookmark', function(data) {
+    // Only show notification if it's not from the current tab
+    if (data.timestamp !== lastBookmarkTimestamp) {
+        showNotification(data, true);
+    }
+});
+
+// Modify the addURL function
+function addURL(event) {
+    event.preventDefault();
+    const urlInput = document.getElementById('url');
+    const categoryInput = document.getElementById('category');
+    const hashtagsInput = document.getElementById('hashtags');
     
-    const newBookmark = {
-        url: url,
-        category: category,
-        hashtags: hashtags,
-        timestamp: new Date().toISOString(),
-        pinned: false
+    const urlData = {
+        url: urlInput.value,
+        category: categoryInput.value,
+        hashtags: hashtagsInput.value,
+        timestamp: new Date().getTime()
     };
 
-    bookmarks.push(newBookmark);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+    // Store the timestamp to prevent duplicate notifications
+    lastBookmarkTimestamp = urlData.timestamp;
+
+    // Save to localStorage as before
+    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    urls.push(urlData);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
+
+    // Trigger Pusher event
+    fetch('/.netlify/functions/trigger-notification', {
+        method: 'POST',
+        body: JSON.stringify(urlData),
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+
+    // Show local notification
+    showNotification(urlData, false);
+    
+    // Reset form
+    urlInput.value = '';
+    categoryInput.value = '';
+    hashtagsInput.value = '';
     
     loadURLs();
-    clearInputs();
-    showNotification(newBookmark);
-
-    // Update the message sent to server to include user identification
-    socket.send(JSON.stringify({
-        type: 'new_bookmark',
-        userId: getCurrentUserId(),  // Add user identification
-        data: newBookmark
-    }));
 }
 
 function clearInputs() {
@@ -191,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updatePinnedLinks(urls);
 });
 
-function showNotification(urlData) {
+function showNotification(urlData, isRemote) {
     const container = document.getElementById('notification-container');
     const notification = document.createElement('div');
     notification.className = 'notification';
