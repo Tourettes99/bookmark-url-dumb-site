@@ -6,15 +6,21 @@ var SYNC_INTERVAL = 30000; // 30 seconds
 
 // Initialize storage when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize storage if empty
     if (!localStorage.getItem(STORAGE_KEY)) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     }
     
-    // Load existing URLs
-    loadURLs();
+    // Check for existing token and initialize
+    const existingToken = localStorage.getItem(TOKEN_KEY);
+    if (existingToken) {
+        const tokenInput = document.getElementById('token-input');
+        if (tokenInput) {
+            tokenInput.value = existingToken;
+            syncWithToken();
+        }
+    }
     
-    // Add event listeners
+    loadURLs();
     document.getElementById('search-input')?.addEventListener('input', searchLinks);
 });
 
@@ -411,7 +417,12 @@ function deleteURL(url) {
     const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
     const updatedUrls = urls.filter(item => item.url !== url);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
+    
+    // Sync the deletion
+    syncChanges(updatedUrls);
+    
     loadURLs();
+    updatePinnedLinks(updatedUrls);
     showNotification('URL deleted successfully!');
 }
 
@@ -579,5 +590,31 @@ function syncWithToken() {
     } catch (error) {
         console.error('Sync error:', error);
         showNotification('Failed to sync. Please try again.', 'error');
+    }
+}
+
+// Add this function to persist token across sessions
+function saveAndSetupToken(token) {
+    localStorage.setItem(TOKEN_KEY, token);
+    // Store timestamp with token
+    localStorage.setItem(`${TOKEN_KEY}_timestamp`, Date.now());
+    setupSyncForToken(token);
+    
+    // Immediately fetch existing bookmarks for this token
+    fetchExistingBookmarks(token);
+}
+
+// Add this function to fetch existing bookmarks
+async function fetchExistingBookmarks(token) {
+    try {
+        const existingTokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
+        if (existingTokenData) {
+            const bookmarks = JSON.parse(existingTokenData);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+            loadURLs();
+            updatePinnedLinks(bookmarks);
+        }
+    } catch (error) {
+        console.error('Error fetching existing bookmarks:', error);
     }
 } 
