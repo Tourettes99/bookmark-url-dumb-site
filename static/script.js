@@ -1,5 +1,5 @@
 // Constants
-const STORAGE_KEY = 'url_bookmarks';
+const STORAGE_KEY = 'teachmode_bookmarks';
 
 // Initialize storage when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -35,28 +35,68 @@ socket.onclose = () => {
 Pusher.logToConsole = true;
 
 const pusher = new Pusher(process.env.PUSHER_KEY, {
-    appId: process.env.PUSHER_APP_ID,
-    key: process.env.PUSHER_KEY,
-    secret: process.env.PUSHER_SECRET,
     cluster: process.env.PUSHER_CLUSTER,
     encrypted: true
 });
 
-// Subscribe to private channel (note the 'private-' prefix)
-const channel = pusher.subscribe('private-bookmarks-channel');
+const channel = pusher.subscribe('bookmarks-sync');
 
-channel.bind('pusher:subscription_succeeded', () => {
-    console.log('Successfully subscribed to private channel');
+// Listen for changes from other devices
+channel.bind('sync-update', function(data) {
+    if (data.source !== getDeviceId()) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
+        updateUI();
+    }
 });
 
-channel.bind('pusher:subscription_error', (error) => {
-    console.error('Subscription error:', error);
-});
+// Generate unique device ID
+function getDeviceId() {
+    let deviceId = localStorage.getItem('device_id');
+    if (!deviceId) {
+        deviceId = 'device_' + Date.now();
+        localStorage.setItem('device_id', deviceId);
+    }
+    return deviceId;
+}
 
-channel.bind('new-bookmark', function(data) {
-    // Only show notification if it's from another user
-    if (data.userId !== getCurrentUserId()) {
-        showNotification(data, true);
+// Sync changes to other devices
+function syncChanges(bookmarks) {
+    fetch('/.netlify/functions/sync-bookmarks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            source: getDeviceId(),
+            bookmarks: bookmarks
+        })
+    });
+}
+
+// Modified save function to include sync
+function saveBookmarks(bookmarks) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+    syncChanges(bookmarks);
+    updateUI();
+}
+
+// Load bookmarks with sync check
+function loadBookmarks() {
+    const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    return bookmarks;
+}
+
+// Update UI elements
+function updateUI() {
+    const bookmarks = loadBookmarks();
+    updatePinnedLinks(bookmarks);
+    updateBookmarksList(bookmarks);
+}
+
+// Add event listener for storage changes
+window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY) {
+        updateUI();
     }
 });
 
@@ -113,7 +153,10 @@ function loadURLs() {
         const pinnedUrls = urls.filter(url => url.pinned);
         
         if (pinnedUrls.length === 0) {
-            pinnedLinksContainer.innerHTML = '<div class="no-pins">No pinned links yet</div>';
+            pinnedLinksContainer.innerHTML = `
+                <div class="empty-state">
+                    <p>No pinned links yet</p>
+                </div>`;
         } else {
             pinnedUrls.forEach(url => {
                 const pinnedDiv = document.createElement('div');
