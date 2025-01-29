@@ -123,6 +123,17 @@ function addURL() {
         dateAdded: new Date().toISOString()
     };
 
+    const currentToken = localStorage.getItem(TOKEN_KEY);
+    if (currentToken) {
+        const tokenSpace = JSON.parse(localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`) || '{"bookmarks":[]}');
+        tokenSpace.bookmarks.push(newBookmark);
+        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(tokenSpace));
+        
+        if (getCookie('cookie_consent') === 'accepted') {
+            setCookie(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(tokenSpace));
+        }
+    }
+
     bookmarks.push(newBookmark);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
     
@@ -476,27 +487,21 @@ function copyToken() {
 
 // Modify the existing generateToken function
 function generateToken() {
-    const token = 'tm_' + Math.random().toString(36).substr(2, 9);
+    const newToken = 'token_' + Date.now();
+    createTokenSpace(newToken);
+    
     const tokenInput = document.getElementById('token-input');
-    tokenInput.value = token;
-    
-    // Show copy button after generating token
-    const copyButton = document.createElement('button');
-    copyButton.className = 'token-button copy-button';
-    copyButton.innerHTML = '📋 Copy';
-    copyButton.onclick = copyToken;
-    
-    // Remove existing copy button if any
-    const existingCopyButton = document.querySelector('.copy-button');
-    if (existingCopyButton) {
-        existingCopyButton.remove();
+    if (tokenInput) {
+        tokenInput.value = newToken;
     }
     
-    // Add new copy button
-    const tokenSection = document.querySelector('.token-section');
-    tokenSection.appendChild(copyButton);
+    // Clear current storage and UI
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    loadURLs();
+    updatePinnedLinks([]);
     
-    showNotification('New sync token generated', 'success');
+    saveAndSetupToken(newToken);
+    showNotification('New sync token generated!', 'success');
 }
 
 // Add this helper function to check if Pusher is properly initialized
@@ -572,11 +577,6 @@ async function fetchExistingBookmarks(token) {
 
 // Modify syncWithToken function
 function syncWithToken() {
-    if (!isPusherInitialized()) {
-        showNotification('Sync service not initialized. Please refresh the page.', 'error');
-        return;
-    }
-
     const inputToken = document.getElementById('token-input').value;
     if (!inputToken) {
         showNotification('Please enter a sync token', 'error');
@@ -584,48 +584,28 @@ function syncWithToken() {
     }
 
     try {
-        const channel = pusher.subscribe(`sync-channel-${inputToken}`);
-        localStorage.setItem(TOKEN_KEY, inputToken);
+        // Get or create token space
+        let tokenSpace = JSON.parse(localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`) || 'null');
+        if (!tokenSpace) {
+            tokenSpace = JSON.parse(getCookie(`${TOKEN_STORAGE_PREFIX}${inputToken}`) || 'null');
+        }
         
-        // Sync existing data from both storages
-        const mergedBookmarks = syncTokenStorage(inputToken);
-        
-        // Update local storage and UI
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedBookmarks));
+        // If token space doesn't exist anywhere, create new
+        if (!tokenSpace) {
+            tokenSpace = createTokenSpace(inputToken);
+        }
+
+        // Update current storage with token space data
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tokenSpace.bookmarks));
         loadURLs();
-        updatePinnedLinks(mergedBookmarks);
+        updatePinnedLinks(tokenSpace.bookmarks);
 
-        // Listen for updates
-        channel.bind('sync-update', function(data) {
-            if (data.source !== getDeviceId()) {
-                const updatedBookmarks = JSON.parse(data.bookmarks);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedBookmarks));
-                
-                // Update both storages
-                localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify(updatedBookmarks));
-                setCookie(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify(updatedBookmarks));
-                
-                loadURLs();
-                updatePinnedLinks(updatedBookmarks);
-                showNotification('Synced with other devices', 'success');
-            }
-        });
-
-        // Initial sync to other devices
-        fetch('/.netlify/functions/sync-bookmarks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                source: getDeviceId(),
-                token: inputToken,
-                bookmarks: mergedBookmarks
-            })
-        });
-
-        showNotification('Sync enabled successfully', 'success');
+        // Set up sync for this token
+        saveAndSetupToken(inputToken);
+        
     } catch (error) {
-        console.error('Sync error:', error);
-        showNotification('Failed to sync. Please try again.', 'error');
+        console.error('Token sync error:', error);
+        showNotification('Failed to sync with token', 'error');
     }
 }
 
@@ -638,6 +618,22 @@ function saveAndSetupToken(token) {
     
     // Immediately fetch existing bookmarks for this token
     fetchExistingBookmarks(token);
+}
+
+// Add this function to manage separate token spaces
+function createTokenSpace(token) {
+    const tokenSpace = {
+        bookmarks: [],
+        pinned: [],
+        dateCreated: new Date().toISOString()
+    };
+    
+    // Set up separate storage for this token
+    localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(tokenSpace));
+    if (getCookie('cookie_consent') === 'accepted') {
+        setCookie(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(tokenSpace));
+    }
+    return tokenSpace;
 }
 
 // Add this function after the showNotification function
