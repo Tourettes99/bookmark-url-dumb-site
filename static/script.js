@@ -1,15 +1,8 @@
-// Constants
-if (typeof TOKEN_STORAGE_PREFIX === 'undefined') {
-    const TOKEN_STORAGE_PREFIX = 'bookmarks_token_';
-}
-if (typeof STORAGE_KEY === 'undefined') {
-    const STORAGE_KEY = 'urls';
-}
-if (typeof TOKEN_KEY === 'undefined') {
-    const TOKEN_KEY = 'sync_token';
-}
-
-const SYNC_INTERVAL = 30000; // 30 seconds
+// Constants - using var for global scope
+var TOKEN_STORAGE_PREFIX = 'bookmarks_token_';
+var STORAGE_KEY = 'urls';
+var TOKEN_KEY = 'sync_token';
+var SYNC_INTERVAL = 30000; // 30 seconds
 
 // Initialize storage when page loads
 document.addEventListener('DOMContentLoaded', function() {
