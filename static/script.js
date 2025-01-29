@@ -22,13 +22,34 @@ socket.onclose = () => {
     console.log('Disconnected from WebSocket server');
 };
 
-// Add this near the top of the file
-const pusher = new Pusher('0BFB1E76B48B2D3174BC425E898D70122225C56B80137D0736D3E9461665F3BB', {
-    cluster: 'fc9cdf01-b041-4632-b7ce-e1169912c516',
+// Enable pusher logging - don't include this in production
+Pusher.logToConsole = true;
+
+const pusher = new Pusher(process.env.PUSHER_KEY, {
+    appId: process.env.PUSHER_APP_ID,
+    key: process.env.PUSHER_KEY,
+    secret: process.env.PUSHER_SECRET,
+    cluster: process.env.PUSHER_CLUSTER,
     encrypted: true
 });
 
-const channel = pusher.subscribe('bookmarks-channel');
+// Subscribe to private channel (note the 'private-' prefix)
+const channel = pusher.subscribe('private-bookmarks-channel');
+
+channel.bind('pusher:subscription_succeeded', () => {
+    console.log('Successfully subscribed to private channel');
+});
+
+channel.bind('pusher:subscription_error', (error) => {
+    console.error('Subscription error:', error);
+});
+
+channel.bind('new-bookmark', function(data) {
+    // Only show notification if it's from another user
+    if (data.userId !== getCurrentUserId()) {
+        showNotification(data, true);
+    }
+});
 
 // Update addURL function
 function addURL(event) {
@@ -231,20 +252,12 @@ function showNotification(urlData, isRemote) {
     }, 5000);
 }
 
-// Update the onmessage handler to only show notifications for OTHER users
-socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    if (data.type === 'new_bookmark' && data.userId !== getCurrentUserId()) {  // Only show if it's not our own bookmark
-        showNotification(data.data);
-    }
-};
-
 // Helper function to get/generate user ID
 function getCurrentUserId() {
-    let userId = localStorage.getItem('user_id');
-    if (!userId) {
-        userId = 'user_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('user_id', userId);
-    }
-    return userId;
+    return localStorage.getItem('userId') || 
+           Math.random().toString(36).substring(2, 15);
+}
+
+function getCurrentUserName() {
+    return localStorage.getItem('userName') || 'Anonymous';
 } 
