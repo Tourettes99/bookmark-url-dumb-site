@@ -6,6 +6,13 @@ var SYNC_INTERVAL = 30000; // 30 seconds
 
 // Initialize storage when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if guide should be hidden
+    const hideGuideStatus = localStorage.getItem('hideGuide');
+    const guide = document.querySelector('.quick-start-guide');
+    if (hideGuideStatus === 'true' && guide) {
+        guide.style.display = 'none';
+    }
+    
     if (!localStorage.getItem(STORAGE_KEY)) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     }
@@ -616,5 +623,14 @@ async function fetchExistingBookmarks(token) {
         }
     } catch (error) {
         console.error('Error fetching existing bookmarks:', error);
+    }
+}
+
+// Add this function after the showNotification function
+function hideGuide() {
+    const guide = document.querySelector('.quick-start-guide');
+    if (guide) {
+        guide.style.display = 'none';
+        localStorage.setItem('hideGuide', 'true');
     }
 } 
