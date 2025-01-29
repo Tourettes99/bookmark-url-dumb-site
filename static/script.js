@@ -210,58 +210,25 @@ window.addEventListener('storage', (e) => {
     }
 });
 
-function loadURLs() {
-    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    
-    // Load pinned links
-    const pinnedLinksContainer = document.getElementById('pinned-links');
-    if (pinnedLinksContainer) {
-        pinnedLinksContainer.innerHTML = '';
-        
-        const pinnedUrls = urls.filter(url => url.pinned);
-        
-        if (pinnedUrls.length === 0) {
-            pinnedLinksContainer.innerHTML = `
-                <div class="empty-state">
-                    <p>No pinned links yet</p>
-                </div>`;
-        } else {
-            pinnedUrls.forEach(url => {
-                const pinnedDiv = document.createElement('div');
-                pinnedDiv.className = 'pinned-link';
-                
-                try {
-                    const urlObj = new URL(url.url);
-                    const faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}`;
-                    
-                    pinnedDiv.innerHTML = `
-                        <a href="${url.url}" target="_blank">
-                            <img src="${faviconUrl}" class="favicon" alt="favicon">
-                            <span>${urlObj.hostname}</span>
-                        </a>
-                    `;
-                    
-                    pinnedLinksContainer.appendChild(pinnedDiv);
-                } catch (e) {
-                    console.error('Error processing URL:', url, e);
-                }
-            });
-        }
+// Add safe JSON parsing helper
+function safeJSONParse(data, defaultValue = []) {
+    try {
+        return data ? JSON.parse(data) : defaultValue;
+    } catch (error) {
+        console.error('JSON Parse error:', error);
+        return defaultValue;
     }
+}
 
-    // Load all URLs
-    const urlsContainer = document.getElementById('urls-container');
-    if (urlsContainer) {
-        urlsContainer.innerHTML = '';
-        
-        if (urls.length === 0) {
-            urlsContainer.innerHTML = '<div class="no-urls">No bookmarks yet</div>';
-        } else {
-            urls.forEach(url => {
-                const urlElement = createURLElement(url);
-                urlsContainer.appendChild(urlElement);
-            });
-        }
+// Modify loadURLs function to handle undefined data
+function loadURLs() {
+    try {
+        const storedData = localStorage.getItem(STORAGE_KEY);
+        const bookmarks = safeJSONParse(storedData, []);
+        updateBookmarksList(bookmarks);
+    } catch (error) {
+        console.error('Load URLs error:', error);
+        updateBookmarksList([]);
     }
 }
 
@@ -509,74 +476,70 @@ function isPusherInitialized() {
     return window.pusher && typeof window.pusher.subscribe === 'function';
 }
 
-// Add this helper function before syncWithToken
-function mergeBookmarks(bookmarks1, bookmarks2) {
-    const urlMap = new Map();
-    
-    // Add all bookmarks from first array
-    bookmarks1.forEach(bookmark => {
-        urlMap.set(bookmark.url, {
-            ...bookmark,
-            dateAdded: bookmark.dateAdded || new Date().toISOString()
-        });
-    });
-    
-    // Add or update bookmarks from second array
-    bookmarks2.forEach(bookmark => {
-        const existing = urlMap.get(bookmark.url);
-        if (existing) {
-            // If bookmark exists, keep the pinned status from the most recently updated one
-            const bookmarkDate = bookmark.dateAdded || new Date().toISOString();
-            urlMap.set(bookmark.url, {
-                ...bookmark,
-                pinned: bookmarkDate > existing.dateAdded ? bookmark.pinned : existing.pinned,
-                dateAdded: bookmarkDate
-            });
-        } else {
-            urlMap.set(bookmark.url, {
-                ...bookmark,
-                dateAdded: bookmark.dateAdded || new Date().toISOString()
-            });
-        }
-    });
-    
-    return Array.from(urlMap.values());
-}
-
-// Add this function to handle token storage synchronization
+// Update syncTokenStorage function
 function syncTokenStorage(token) {
-    // Get existing token data from both storages
-    const browserTokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
-    const cookieTokenData = getCookie(`${TOKEN_STORAGE_PREFIX}${token}`);
-    
-    // Merge data from both sources
-    const browserBookmarks = browserTokenData ? JSON.parse(browserTokenData) : [];
-    const cookieBookmarks = cookieTokenData ? JSON.parse(cookieTokenData) : [];
-    const mergedBookmarks = mergeBookmarks(browserBookmarks, cookieBookmarks);
-    
-    // Save merged data to both storages
-    localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(mergedBookmarks));
-    setCookie(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(mergedBookmarks));
-    
-    return mergedBookmarks;
-}
-
-// Modify fetchExistingBookmarks function
-async function fetchExistingBookmarks(token) {
     try {
-        const mergedBookmarks = syncTokenStorage(token);
-        if (mergedBookmarks.length > 0) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedBookmarks));
-            loadURLs();
-            updatePinnedLinks(mergedBookmarks);
-        }
+        // Get existing token data from both storages
+        const browserTokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
+        const cookieTokenData = getCookie(`${TOKEN_STORAGE_PREFIX}${token}`);
+        
+        // Safely parse data with defaults
+        const browserBookmarks = safeJSONParse(browserTokenData, []);
+        const cookieBookmarks = safeJSONParse(cookieTokenData, []);
+        
+        // Ensure both are arrays before merging
+        const mergedBookmarks = Array.isArray(browserBookmarks) && Array.isArray(cookieBookmarks) 
+            ? mergeBookmarks(browserBookmarks, cookieBookmarks)
+            : [];
+        
+        // Save merged data to both storages
+        const tokenData = JSON.stringify(mergedBookmarks);
+        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, tokenData);
+        setCookie(`${TOKEN_STORAGE_PREFIX}${token}`, tokenData);
+        
+        return mergedBookmarks;
     } catch (error) {
-        console.error('Error fetching existing bookmarks:', error);
+        console.error('Sync token storage error:', error);
+        return [];
     }
 }
 
-// Modify syncWithToken function
+// Update mergeBookmarks function
+function mergeBookmarks(bookmarks1, bookmarks2) {
+    try {
+        // Ensure inputs are arrays
+        const array1 = Array.isArray(bookmarks1) ? bookmarks1 : [];
+        const array2 = Array.isArray(bookmarks2) ? bookmarks2 : [];
+        
+        // Create a map of existing URLs
+        const urlMap = new Map();
+        
+        array1.forEach(bookmark => {
+            if (bookmark && bookmark.url) {
+                urlMap.set(bookmark.url, bookmark);
+            }
+        });
+        
+        array2.forEach(bookmark => {
+            if (bookmark && bookmark.url) {
+                urlMap.set(bookmark.url, bookmark);
+            }
+        });
+        
+        return Array.from(urlMap.values());
+    } catch (error) {
+        console.error('Merge bookmarks error:', error);
+        return [];
+    }
+}
+
+// Update syncWithToken function
 function syncWithToken() {
+    if (!isPusherInitialized()) {
+        showNotification('Sync service not initialized. Please refresh the page.', 'error');
+        return;
+    }
+
     const inputToken = document.getElementById('token-input').value;
     if (!inputToken) {
         showNotification('Please enter a sync token', 'error');
@@ -584,28 +547,23 @@ function syncWithToken() {
     }
 
     try {
-        // Get or create token space
-        let tokenSpace = JSON.parse(localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`) || 'null');
-        if (!tokenSpace) {
-            tokenSpace = JSON.parse(getCookie(`${TOKEN_STORAGE_PREFIX}${inputToken}`) || 'null');
+        const channel = pusher.subscribe(`sync-channel-${inputToken}`);
+        localStorage.setItem(TOKEN_KEY, inputToken);
+        
+        // Initialize empty storage for new tokens
+        if (!localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`)) {
+            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify([]));
         }
         
-        // If token space doesn't exist anywhere, create new
-        if (!tokenSpace) {
-            tokenSpace = createTokenSpace(inputToken);
-        }
-
-        // Update current storage with token space data
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(tokenSpace.bookmarks));
+        const mergedBookmarks = syncTokenStorage(inputToken);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedBookmarks));
         loadURLs();
-        updatePinnedLinks(tokenSpace.bookmarks);
-
-        // Set up sync for this token
-        saveAndSetupToken(inputToken);
+        updatePinnedLinks(mergedBookmarks);
         
+        // Rest of the existing syncWithToken code...
     } catch (error) {
         console.error('Token sync error:', error);
-        showNotification('Failed to sync with token', 'error');
+        showNotification('Failed to sync. Please try again.', 'error');
     }
 }
 
