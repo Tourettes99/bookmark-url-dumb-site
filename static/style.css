@@ -331,85 +331,82 @@ button:hover {
 /* Mobile specific updates for bottom pinned bar */
 @media screen and (max-width: 768px) {
     .sidebar {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
         width: 100%;
-        background-color: #111;
+        height: auto;
+        position: fixed;
+        bottom: 0;
+        border-right: none;
         border-top: 2px solid var(--orange);
-        padding: 12px 15px;
+        padding: 10px;
         z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        align-items: center; /* Center content horizontally */
     }
 
     .sidebar h2 {
-        font-size: 0.9em;
-        color: var(--orange);
-        margin-bottom: 8px;
-        width: 100%;
-        text-align: left;
+        font-size: 1.2em;
+        margin-bottom: 10px;
     }
 
     #pinned-links {
-        width: 100%;
-        max-width: 95%; /* Slightly narrower than full width */
         display: flex;
         overflow-x: auto;
         gap: 10px;
-        padding: 0 5px 4px 5px;
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-        margin: 0 auto; /* Center the container */
+        padding-bottom: 5px;
+        scrollbar-width: none;  /* Firefox */
+        -ms-overflow-style: none;  /* IE and Edge */
     }
 
     #pinned-links::-webkit-scrollbar {
-        display: none;
+        display: none;  /* Chrome, Safari, Opera */
     }
 
     .pinned-link {
-        background-color: #000;
-        border: 1px solid var(--orange);
-        border-radius: 8px;
+        flex: 0 0 auto;
+        background-color: #111;
         padding: 8px 12px;
-        flex-shrink: 0;
-        margin: 2px 0; /* Add small vertical margin */
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        border-radius: 8px;
+        border: 1px solid var(--orange);
     }
 
-    .pinned-link a {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        color: var(--text-gray);
-        text-decoration: none;
-        font-size: 0.9em;
-        white-space: nowrap;
-    }
-
-    .pinned-link .favicon {
-        width: 16px;
-        height: 16px;
-        vertical-align: middle;
-    }
-
-    /* Adjust main content to account for pinned bar */
     .main-content {
-        margin-bottom: 100px;
+        margin-left: 0;
+        margin-bottom: 120px;
+        padding: 15px;
     }
 
-    /* Ensure notifications appear above the pinned bar */
+    .url-card {
+        margin: 10px 0;
+    }
+
+    .add-url-form {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .search-section {
+        flex-direction: column;
+        gap: 8px;
+    }
+
     #notification-container {
-        bottom: 90px;
-        z-index: 1001;
+        bottom: 140px;
     }
 }
 
-/* Add viewport meta tag to your HTML if not already present */
+/* Keep existing styles for larger screens */
+@media screen and (min-width: 769px) {
+    .main-content {
+        margin-left: 270px;
+    }
+
+    .sidebar {
+        top: 0;
+    }
+}
 
 /* Main container */
 .container {
@@ -496,4 +493,5 @@ button:hover {
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.9em;
+} 
 } 
