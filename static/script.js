@@ -212,10 +212,13 @@ function syncChanges(bookmarks) {
     if (!userToken) return;
 
     try {
-        // Update both storages
+        // Update both storages with stringified data
         const bookmarksString = JSON.stringify(bookmarks);
         localStorage.setItem(STORAGE_KEY, bookmarksString);
         localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${userToken}`, bookmarksString);
+
+        // Force reload URLs after sync
+        loadURLs();
 
         // Send update to other devices
         fetch('/.netlify/functions/sync-bookmarks', {
@@ -280,10 +283,12 @@ function loadURLs() {
         const bookmarks = safeJSONParse(localStorage.getItem(STORAGE_KEY), []);
         updateBookmarksList(bookmarks);
         updatePinnedLinks(bookmarks);
+        displayURLs(bookmarks); // Always display URLs regardless of search
     } catch (error) {
         console.error('Load URLs error:', error);
         updateBookmarksList([]);
         updatePinnedLinks([]);
+        displayURLs([]); // Display empty state
     }
 }
 
@@ -372,11 +377,18 @@ function updatePinnedLinks(urls) {
 
 function searchLinks() {
     const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    
+    if (!searchTerm) {
+        // If search is empty, show all bookmarks
+        displayURLs(bookmarks);
+        return;
+    }
     
     const filtered = bookmarks.filter(bookmark => 
         bookmark.url.toLowerCase().includes(searchTerm) ||
-        bookmark.hashtags.toLowerCase().includes(searchTerm)
+        (bookmark.hashtags && bookmark.hashtags.some(tag => tag.toLowerCase().includes(searchTerm))) ||
+        (bookmark.category && bookmark.category.toLowerCase().includes(searchTerm))
     );
     
     displayURLs(filtered);
