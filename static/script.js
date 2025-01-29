@@ -710,3 +710,56 @@ function refreshCurrentToken() {
         showNotification('No data found for current token', 'warning');
     }
 }
+
+// Add this function to hide the guide
+function hideGuide() {
+    const guide = document.querySelector('.quick-start-guide');
+    if (guide) {
+        guide.style.display = 'none';
+        localStorage.setItem('hideGuide', 'true');
+    }
+}
+
+// Add cookie consent functions
+function showCookieConsent() {
+    const consentDiv = document.createElement('div');
+    consentDiv.className = 'cookie-consent';
+    consentDiv.innerHTML = `
+        <div class="cookie-content">
+            <p>We use cookies to enhance your experience and enable sync features.</p>
+            <div class="cookie-buttons">
+                <button class="accept-button" onclick="acceptCookies()">Accept</button>
+                <button class="decline-button" onclick="declineCookies()">Decline</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(consentDiv);
+}
+
+function acceptCookies() {
+    localStorage.setItem('cookieConsent', 'accepted');
+    document.querySelector('.cookie-consent').remove();
+}
+
+function declineCookies() {
+    localStorage.setItem('cookieConsent', 'declined');
+    document.querySelector('.cookie-consent').remove();
+}
+
+// Add these helper functions for cookie management
+function setCookie(name, value) {
+    if (localStorage.getItem('cookieConsent') === 'accepted') {
+        const date = new Date();
+        date.setTime(date.getTime() + (365 * 24 * 60 * 60 * 1000));
+        document.cookie = `${name}=${value};expires=${date.toUTCString()};path=/`;
+    }
+}
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) {
+        return parts.pop().split(';').shift();
+    }
+    return null;
+}
