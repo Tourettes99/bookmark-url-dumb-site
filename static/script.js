@@ -597,27 +597,34 @@ function copyToken() {
 
 // Modify the existing generateToken function
 function generateToken() {
+    // Save previous token and its data if exists
+    const previousToken = localStorage.getItem(TOKEN_KEY);
+    if (previousToken) {
+        const previousData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${previousToken}`);
+        if (previousData) {
+            localStorage.setItem(`token_history_${previousToken}`, previousData);
+        }
+    }
+
     const newToken = 'token_' + Date.now();
-    
     const tokenInput = document.getElementById('token-input');
     if (tokenInput) {
         tokenInput.value = newToken;
     }
     
-    // Clear all storages for new token
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    // Initialize new token with empty data
+    localStorage.setItem(TOKEN_KEY, newToken);
     localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${newToken}`, JSON.stringify([]));
+    setCookie(TOKEN_KEY, newToken);
     setCookie(`${TOKEN_STORAGE_PREFIX}${newToken}`, JSON.stringify([]));
     
-    // Set up new token space
-    createTokenSpace(newToken);
-    
-    // Update UI
+    // Clear current display
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     loadURLs();
     updatePinnedLinks([]);
     
-    saveAndSetupToken(newToken);
-    showNotification('New sync token generated with empty storage!', 'success');
+    setupSyncForToken(newToken);
+    showNotification('New sync token generated!', 'success');
 }
 
 // Add this helper function to check if Pusher is properly initialized
@@ -691,46 +698,53 @@ function syncWithToken() {
     }
 
     try {
-        // Check if this is an existing token with data
-        const existingData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`) || 
-                            getCookie(`${TOKEN_STORAGE_PREFIX}${inputToken}`);
+        // Check all possible storage locations for token data
+        const tokenData = 
+            localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`) ||
+            getCookie(`${TOKEN_STORAGE_PREFIX}${inputToken}`) ||
+            localStorage.getItem(`token_history_${inputToken}`);
 
-        // Save token in both storages
-        localStorage.setItem(TOKEN_KEY, inputToken);
-        setCookie(TOKEN_KEY, inputToken);
-        
-        if (existingData) {
-            // Handle existing token data
-            const parsedData = JSON.parse(decodeURIComponent(existingData));
+        if (tokenData) {
+            // Valid token with existing data found
+            const parsedData = JSON.parse(decodeURIComponent(tokenData));
             const bookmarks = Array.isArray(parsedData) ? parsedData : 
                             (parsedData && Array.isArray(parsedData.data) ? parsedData.data : []);
+
+            // Update all storage locations
+            localStorage.setItem(TOKEN_KEY, inputToken);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify(bookmarks));
             
-            // Update all storages with existing data
-            unifiedStorageHandler(inputToken, bookmarks);
-            
-            // Update UI with existing data
+            // Update cookies
+            setCookie(TOKEN_KEY, inputToken);
+            setCookie(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify(bookmarks));
+
+            // Update UI
             loadURLs();
             updatePinnedLinks(bookmarks);
             
-            // Set up real-time sync
+            // Setup real-time sync
             setupSyncForToken(inputToken);
             
-            showNotification('Successfully loaded existing data', 'success');
+            showNotification('Successfully loaded token data!', 'success');
         } else {
-            // Handle new token without existing data
-            const currentData = localStorage.getItem(STORAGE_KEY);
-            const bookmarks = currentData ? JSON.parse(currentData) : [];
+            // New token without existing data
+            localStorage.setItem(TOKEN_KEY, inputToken);
+            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify([]));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
             
-            // Save current data to token storage
-            unifiedStorageHandler(inputToken, bookmarks);
+            setCookie(TOKEN_KEY, inputToken);
+            setCookie(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify([]));
+            
+            loadURLs();
+            updatePinnedLinks([]);
             setupSyncForToken(inputToken);
             
-            showNotification('New token initialized with current data', 'success');
+            showNotification('Initialized new token storage', 'info');
         }
-        
     } catch (error) {
         console.error('Token sync error:', error);
-        showNotification('Failed to sync. Please try again.', 'error');
+        showNotification('Failed to sync token data', 'error');
     }
 }
 
