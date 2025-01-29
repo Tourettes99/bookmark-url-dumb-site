@@ -4,6 +4,10 @@ const SYNC_INTERVAL = 30000; // 30 seconds
 const TOKEN_KEY = 'teachmode_user_token';
 const TOKEN_STORAGE_PREFIX = 'teachmode_data_';
 
+// Add these constants at the top of your file with other constants
+const TOKEN_STORAGE_PREFIX = 'bookmarks_token_';
+const TOKEN_KEY = 'sync_token';
+
 // Initialize storage when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize storage if empty
@@ -473,6 +477,40 @@ function generateToken() {
 // Add this helper function to check if Pusher is properly initialized
 function isPusherInitialized() {
     return window.pusher && typeof window.pusher.subscribe === 'function';
+}
+
+// Add this helper function before syncWithToken
+function mergeBookmarks(bookmarks1, bookmarks2) {
+    const urlMap = new Map();
+    
+    // Add all bookmarks from first array
+    bookmarks1.forEach(bookmark => {
+        urlMap.set(bookmark.url, {
+            ...bookmark,
+            dateAdded: bookmark.dateAdded || new Date().toISOString()
+        });
+    });
+    
+    // Add or update bookmarks from second array
+    bookmarks2.forEach(bookmark => {
+        const existing = urlMap.get(bookmark.url);
+        if (existing) {
+            // If bookmark exists, keep the pinned status from the most recently updated one
+            const bookmarkDate = bookmark.dateAdded || new Date().toISOString();
+            urlMap.set(bookmark.url, {
+                ...bookmark,
+                pinned: bookmarkDate > existing.dateAdded ? bookmark.pinned : existing.pinned,
+                dateAdded: bookmarkDate
+            });
+        } else {
+            urlMap.set(bookmark.url, {
+                ...bookmark,
+                dateAdded: bookmark.dateAdded || new Date().toISOString()
+            });
+        }
+    });
+    
+    return Array.from(urlMap.values());
 }
 
 // Update the sync function to check Pusher status
