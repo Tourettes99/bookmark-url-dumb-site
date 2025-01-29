@@ -6,6 +6,9 @@ if (!localStorage.getItem(STORAGE_KEY)) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
 }
 
+// Using WebSocket for real-time communication
+const socket = new WebSocket('ws://your-server.com');
+
 function addURL() {
     const url = document.getElementById('url-input').value;
     const category = document.getElementById('category-input').value;
@@ -27,6 +30,12 @@ function addURL() {
     loadURLs();
     clearInputs();
     showNotification(newBookmark);
+
+    // Send to server
+    socket.send(JSON.stringify({
+        type: 'new_bookmark',
+        data: newBookmark
+    }));
 }
 
 function clearInputs() {
@@ -178,7 +187,7 @@ function showNotification(urlData) {
     
     notification.innerHTML = `
         <img src="${faviconUrl}" class="favicon" alt="favicon">
-        Someone bookmarked <strong>${hostname}</strong>
+        You bookmarked <strong>${hostname}</strong>
         ${urlData.category ? `in ${urlData.category}` : ''}
     `;
     
@@ -188,4 +197,12 @@ function showNotification(urlData) {
     setTimeout(() => {
         notification.remove();
     }, 5000);
-} 
+}
+
+// Listen for other users' bookmarks
+socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === 'new_bookmark') {
+        showNotification(data.data);
+    }
+}; 
