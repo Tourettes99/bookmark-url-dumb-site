@@ -598,20 +598,26 @@ function copyToken() {
 // Modify the existing generateToken function
 function generateToken() {
     const newToken = 'token_' + Date.now();
-    createTokenSpace(newToken);
     
     const tokenInput = document.getElementById('token-input');
     if (tokenInput) {
         tokenInput.value = newToken;
     }
     
-    // Clear current storage and UI
+    // Clear all storages for new token
     localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${newToken}`, JSON.stringify([]));
+    setCookie(`${TOKEN_STORAGE_PREFIX}${newToken}`, JSON.stringify([]));
+    
+    // Set up new token space
+    createTokenSpace(newToken);
+    
+    // Update UI
     loadURLs();
     updatePinnedLinks([]);
     
     saveAndSetupToken(newToken);
-    showNotification('New sync token generated!', 'success');
+    showNotification('New sync token generated with empty storage!', 'success');
 }
 
 // Add this helper function to check if Pusher is properly initialized
@@ -685,27 +691,42 @@ function syncWithToken() {
     }
 
     try {
+        // Check if this is an existing token with data
+        const existingData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`) || 
+                            getCookie(`${TOKEN_STORAGE_PREFIX}${inputToken}`);
+
         // Save token in both storages
         localStorage.setItem(TOKEN_KEY, inputToken);
-        document.cookie = `${TOKEN_KEY}=${inputToken};path=/;max-age=31536000`;
+        setCookie(TOKEN_KEY, inputToken);
         
-        // Fetch and merge data from all possible sources
-        fetchAndMergeData(inputToken).then(mergedData => {
-            // Save merged data to both storages
-            unifiedStorageHandler(inputToken, mergedData);
+        if (existingData) {
+            // Handle existing token data
+            const parsedData = JSON.parse(decodeURIComponent(existingData));
+            const bookmarks = Array.isArray(parsedData) ? parsedData : 
+                            (parsedData && Array.isArray(parsedData.data) ? parsedData.data : []);
             
-            // Update UI
+            // Update all storages with existing data
+            unifiedStorageHandler(inputToken, bookmarks);
+            
+            // Update UI with existing data
             loadURLs();
-            updatePinnedLinks(mergedData);
+            updatePinnedLinks(bookmarks);
             
             // Set up real-time sync
             setupSyncForToken(inputToken);
             
-            showNotification('Successfully synced across devices', 'success');
-        }).catch(error => {
-            console.error('Fetch and merge error:', error);
-            showNotification('Sync error, trying backup data', 'warning');
-        });
+            showNotification('Successfully loaded existing data', 'success');
+        } else {
+            // Handle new token without existing data
+            const currentData = localStorage.getItem(STORAGE_KEY);
+            const bookmarks = currentData ? JSON.parse(currentData) : [];
+            
+            // Save current data to token storage
+            unifiedStorageHandler(inputToken, bookmarks);
+            setupSyncForToken(inputToken);
+            
+            showNotification('New token initialized with current data', 'success');
+        }
         
     } catch (error) {
         console.error('Token sync error:', error);
@@ -816,14 +837,32 @@ function refreshCurrentToken() {
         return;
     }
 
-    // Get data from token storage
-    const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`);
-    if (tokenData) {
-        localStorage.setItem(STORAGE_KEY, tokenData);
-        loadURLs();
-        showNotification('Data refreshed successfully!', 'success');
-    } else {
-        showNotification('No data found for current token', 'warning');
+    try {
+        // Get data from all possible sources
+        const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`) || 
+                         getCookie(`${TOKEN_STORAGE_PREFIX}${currentToken}`);
+        
+        if (tokenData) {
+            const parsedData = JSON.parse(decodeURIComponent(tokenData));
+            const bookmarks = Array.isArray(parsedData) ? parsedData : [];
+            
+            // Update all storages
+            unifiedStorageHandler(currentToken, bookmarks);
+            
+            // Update UI
+            loadURLs();
+            updatePinnedLinks(bookmarks);
+            
+            // Trigger sync to other devices
+            syncChanges(bookmarks);
+            
+            showNotification('Data refreshed and synced successfully!', 'success');
+        } else {
+            showNotification('No data found for current token', 'warning');
+        }
+    } catch (error) {
+        console.error('Refresh error:', error);
+        showNotification('Failed to refresh data', 'error');
     }
 }
 
