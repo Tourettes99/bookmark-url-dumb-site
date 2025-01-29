@@ -115,9 +115,24 @@ async function setupSyncForToken(token) {
         
         const channel = window.pusher.subscribe(channelName);
         
+        // Immediately fetch existing data when subscribing
+        const existingData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
+        if (existingData) {
+            try {
+                const parsedData = JSON.parse(existingData);
+                localStorage.setItem(STORAGE_KEY, existingData);
+                loadURLs();
+            } catch (error) {
+                console.error('Error parsing existing data:', error);
+            }
+        }
+        
         channel.bind('sync-update', function(data) {
             if (data.source !== getDeviceId()) {
                 handleSyncUpdate(data);
+                // Update local storage with new data
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
+                loadURLs();
             }
         });
     } catch (error) {
@@ -239,21 +254,26 @@ function addURL() {
 
 // Sync changes to other devices
 function syncChanges(bookmarks) {
-    syncQueue.add(async () => {
-        const token = localStorage.getItem(TOKEN_KEY);
-        if (!token) return;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    
+    try {
+        // Store in token-specific storage
+        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(bookmarks));
         
-        const versionedData = await versionedSync(token, bookmarks);
-        await fetch('/.netlify/functions/sync-bookmarks', {
+        // Send to other devices
+        fetch('/.netlify/functions/sync-bookmarks', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 source: getDeviceId(),
                 token: token,
-                bookmarks: versionedData
+                bookmarks: bookmarks
             })
-        });
-    });
+        }).catch(error => console.error('Sync error:', error));
+    } catch (error) {
+        console.error('Sync changes error:', error);
+    }
 }
 
 // Modified togglePin function to include sync
@@ -977,5 +997,26 @@ function handleStorageChange(event) {
         } catch (error) {
             console.error('Storage sync error:', error);
         }
+    }
+}
+
+function handleSyncUpdate(data) {
+    try {
+        if (!data || !data.bookmarks) return;
+        
+        // Update both token storage and current storage
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (token) {
+            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(data.bookmarks));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
+            
+            // Update UI
+            loadURLs();
+            updatePinnedLinks(data.bookmarks);
+            showNotification('Synced with other devices', 'success');
+        }
+    } catch (error) {
+        console.error('Sync update error:', error);
+        showNotification('Failed to sync with other devices', 'error');
     }
 }
