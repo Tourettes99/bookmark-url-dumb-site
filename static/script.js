@@ -194,7 +194,13 @@ function addURL() {
         // Validate URL
         new URL(urlInput.value);
         
-        const urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        // Ensure urls is an array by using safeJSONParse
+        const urls = safeJSONParse(localStorage.getItem(STORAGE_KEY), []);
+        
+        // Verify urls is an array before proceeding
+        if (!Array.isArray(urls)) {
+            throw new Error('Storage data is corrupted');
+        }
         
         const newUrl = {
             url: urlInput.value,
