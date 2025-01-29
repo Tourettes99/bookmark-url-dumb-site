@@ -3,6 +3,7 @@ var TOKEN_STORAGE_PREFIX = 'bookmarks_token_';
 var STORAGE_KEY = 'urls';
 var TOKEN_KEY = 'sync_token';
 var SYNC_INTERVAL = 30000; // 30 seconds
+const STORAGE_VALIDATION_INTERVAL = 300000; // 5 minutes
 
 // Add this at the beginning of the file, after the constants
 const isPuppeteerTest = navigator.userAgent.includes('HeadlessChrome');
@@ -1052,12 +1053,17 @@ const syncQueue = {
     }
 };
 
-setInterval(() => {
+function validateStorageHealth() {
+    const currentToken = localStorage.getItem(TOKEN_KEY) || getCookie(TOKEN_KEY);
     const health = validateStorage(currentToken);
+    
     if (!health.localStorage.available) {
         showNotification('Local storage is not available', 'error');
     }
-}, 300000); // Every 5 minutes
+}
+
+// Set up the interval
+setInterval(validateStorageHealth, STORAGE_VALIDATION_INTERVAL);
 
 function handleStorageChange(event) {
     if (!event.key || !event.newValue) return;
