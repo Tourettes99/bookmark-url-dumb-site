@@ -146,14 +146,13 @@ function syncChanges(bookmarks) {
     const userToken = localStorage.getItem(TOKEN_KEY);
     if (!userToken) return;
 
-    // Update token-specific storage
+    // Update both storages
     localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${userToken}`, JSON.stringify(bookmarks));
+    setCookie(`${TOKEN_STORAGE_PREFIX}${userToken}`, JSON.stringify(bookmarks));
 
     fetch('/.netlify/functions/sync-bookmarks', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             source: getDeviceId(),
             token: userToken,
@@ -539,7 +538,39 @@ function mergeBookmarks(bookmarks1, bookmarks2) {
     return Array.from(urlMap.values());
 }
 
-// Update the sync function to check Pusher status
+// Add this function to handle token storage synchronization
+function syncTokenStorage(token) {
+    // Get existing token data from both storages
+    const browserTokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
+    const cookieTokenData = getCookie(`${TOKEN_STORAGE_PREFIX}${token}`);
+    
+    // Merge data from both sources
+    const browserBookmarks = browserTokenData ? JSON.parse(browserTokenData) : [];
+    const cookieBookmarks = cookieTokenData ? JSON.parse(cookieTokenData) : [];
+    const mergedBookmarks = mergeBookmarks(browserBookmarks, cookieBookmarks);
+    
+    // Save merged data to both storages
+    localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(mergedBookmarks));
+    setCookie(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(mergedBookmarks));
+    
+    return mergedBookmarks;
+}
+
+// Modify fetchExistingBookmarks function
+async function fetchExistingBookmarks(token) {
+    try {
+        const mergedBookmarks = syncTokenStorage(token);
+        if (mergedBookmarks.length > 0) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedBookmarks));
+            loadURLs();
+            updatePinnedLinks(mergedBookmarks);
+        }
+    } catch (error) {
+        console.error('Error fetching existing bookmarks:', error);
+    }
+}
+
+// Modify syncWithToken function
 function syncWithToken() {
     if (!isPusherInitialized()) {
         showNotification('Sync service not initialized. Please refresh the page.', 'error');
@@ -553,52 +584,45 @@ function syncWithToken() {
     }
 
     try {
-        // Subscribe to a private channel for this token
         const channel = pusher.subscribe(`sync-channel-${inputToken}`);
-        
-        // Store token
         localStorage.setItem(TOKEN_KEY, inputToken);
         
-        // Get existing bookmarks for this token from storage
-        const existingTokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`);
-        const existingBookmarks = existingTokenData ? JSON.parse(existingTokenData) : [];
+        // Sync existing data from both storages
+        const mergedBookmarks = syncTokenStorage(inputToken);
         
-        // Get current bookmarks
-        const currentBookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        
-        // Merge bookmarks, removing duplicates based on URL
-        const mergedBookmarks = mergeBookmarks(currentBookmarks, existingBookmarks);
-        
-        // Update local storage with merged bookmarks
+        // Update local storage and UI
         localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedBookmarks));
-        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify(mergedBookmarks));
-        
-        // Listen for updates from other devices
+        loadURLs();
+        updatePinnedLinks(mergedBookmarks);
+
+        // Listen for updates
         channel.bind('sync-update', function(data) {
             if (data.source !== getDeviceId()) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
+                const updatedBookmarks = JSON.parse(data.bookmarks);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedBookmarks));
+                
+                // Update both storages
+                localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify(updatedBookmarks));
+                setCookie(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify(updatedBookmarks));
+                
                 loadURLs();
-                updatePinnedLinks(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []);
+                updatePinnedLinks(updatedBookmarks);
                 showNotification('Synced with other devices', 'success');
             }
         });
 
-        // Send current bookmarks to other devices
-        const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        // Initial sync to other devices
         fetch('/.netlify/functions/sync-bookmarks', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 source: getDeviceId(),
                 token: inputToken,
-                bookmarks: bookmarks
+                bookmarks: mergedBookmarks
             })
         });
 
         showNotification('Sync enabled successfully', 'success');
-        
     } catch (error) {
         console.error('Sync error:', error);
         showNotification('Failed to sync. Please try again.', 'error');
@@ -614,21 +638,6 @@ function saveAndSetupToken(token) {
     
     // Immediately fetch existing bookmarks for this token
     fetchExistingBookmarks(token);
-}
-
-// Add this function to fetch existing bookmarks
-async function fetchExistingBookmarks(token) {
-    try {
-        const existingTokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
-        if (existingTokenData) {
-            const bookmarks = JSON.parse(existingTokenData);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
-            loadURLs();
-            updatePinnedLinks(bookmarks);
-        }
-    } catch (error) {
-        console.error('Error fetching existing bookmarks:', error);
-    }
 }
 
 // Add this function after the showNotification function
