@@ -26,6 +26,7 @@ function addURL() {
     
     loadURLs();
     clearInputs();
+    showNotification(newBookmark);
 }
 
 function clearInputs() {
@@ -165,4 +166,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
     displayURLs(urls);
     updatePinnedLinks(urls);
-}); 
+});
+
+function showNotification(urlData) {
+    const container = document.getElementById('notification-container');
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(urlData.url).hostname}`;
+    const hostname = new URL(urlData.url).hostname;
+    
+    notification.innerHTML = `
+        <img src="${faviconUrl}" class="favicon" alt="favicon">
+        Someone bookmarked <strong>${hostname}</strong>
+        ${urlData.category ? `in ${urlData.category}` : ''}
+    `;
+    
+    container.appendChild(notification);
+    
+    // Remove notification after animation ends (5 seconds)
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+} 
