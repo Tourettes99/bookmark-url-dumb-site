@@ -727,3 +727,35 @@ button:hover {
     color: #ffffff;
     text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
 }
+
+.cookie-consent {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    padding: 15px 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 1000;
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.cookie-consent button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cookie-consent button:first-of-type {
+    background: #ff5722;
+    color: white;
+}
+
+.cookie-consent button:last-of-type {
+    background: #666;
+    color: white;
+}

@@ -633,4 +633,89 @@ function hideGuide() {
         guide.style.display = 'none';
         localStorage.setItem('hideGuide', 'true');
     }
-} 
+}
+
+// Add this cookie management system
+function setCookie(name, value, days = 30) {
+    const d = new Date();
+    d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+    const expires = "expires=" + d.toUTCString();
+    document.cookie = name + "=" + value + ";" + expires + ";path=/";
+}
+
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for(let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
+
+function deleteCookie(name) {
+    document.cookie = name + '=; Max-Age=-99999999;';
+}
+
+// Add cookie consent check
+function checkCookieConsent() {
+    const consent = getCookie('cookie_consent');
+    if (!consent) {
+        const notification = document.createElement('div');
+        notification.className = 'cookie-consent';
+        notification.innerHTML = `
+            <p>This site uses cookies to improve your experience. 
+               Do you accept cookies for better storage?</p>
+            <button onclick="acceptCookies()">Accept</button>
+            <button onclick="declineCookies()">Decline</button>
+        `;
+        document.body.appendChild(notification);
+    }
+    return consent === 'accepted';
+}
+
+function acceptCookies() {
+    setCookie('cookie_consent', 'accepted');
+    document.querySelector('.cookie-consent')?.remove();
+    // Transfer current localStorage to cookies
+    syncToCookies();
+}
+
+function declineCookies() {
+    setCookie('cookie_consent', 'declined');
+    document.querySelector('.cookie-consent')?.remove();
+}
+
+function syncToCookies() {
+    if (getCookie('cookie_consent') === 'accepted') {
+        const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        setCookie(STORAGE_KEY, JSON.stringify(bookmarks));
+        
+        // Sync other important data
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (token) setCookie(TOKEN_KEY, token);
+        
+        const deviceId = localStorage.getItem('device_id');
+        if (deviceId) setCookie('device_id', deviceId);
+    }
+}
+
+// Modify existing storage functions to use both localStorage and cookies
+const originalSetItem = localStorage.setItem;
+localStorage.setItem = function(key, value) {
+    originalSetItem.apply(this, arguments);
+    if (getCookie('cookie_consent') === 'accepted') {
+        setCookie(key, value);
+    }
+};
+
+const originalGetItem = localStorage.getItem;
+localStorage.getItem = function(key) {
+    const localValue = originalGetItem.apply(this, arguments);
+    if (getCookie('cookie_consent') === 'accepted') {
+        const cookieValue = getCookie(key);
+        return localValue || cookieValue;
+    }
+    return localValue;
+}; 
