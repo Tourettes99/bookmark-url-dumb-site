@@ -18,6 +18,14 @@ body {
     background-color: #111;
     padding: 20px;
     border-right: 2px solid var(--orange);
+    overflow-y: auto;
+}
+
+.sidebar h2 {
+    color: var(--orange);
+    font-size: 1.8em;
+    margin-bottom: 25px;
+    text-align: center;
 }
 
 .main-content {
@@ -163,4 +171,38 @@ button:hover {
 .import-export button:hover {
     background-color: #ff7444;
     transform: translateY(-2px);
+}
+
+/* Add new styles for pinned links */
+#pinned-links {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#pinned-links div {
+    background-color: #111;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid var(--orange);
+    transition: all 0.3s ease;
+}
+
+#pinned-links div:hover {
+    transform: translateX(5px);
+    box-shadow: 0 5px 15px rgba(255, 92, 40, 0.2);
+}
+
+#pinned-links a {
+    color: var(--text-gray);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9em;
+}
+
+#pinned-links img.favicon {
+    width: 16px;
+    height: 16px;
 } 

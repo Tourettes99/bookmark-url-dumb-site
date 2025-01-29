@@ -85,7 +85,14 @@ function updatePinnedLinks(urls) {
 
     urls.filter(url => url.pinned).forEach(url => {
         const link = document.createElement('div');
-        link.innerHTML = `<a href="${url.url}" target="_blank">${url.url}</a>`;
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}`;
+        
+        link.innerHTML = `
+            <a href="${url.url}" target="_blank">
+                <img src="${faviconUrl}" class="favicon" alt="favicon">
+                ${url.url}
+            </a>
+        `;
         pinnedContainer.appendChild(link);
     });
 }
