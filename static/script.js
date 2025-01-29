@@ -103,7 +103,53 @@ function getDeviceId() {
     return deviceId;
 }
 
-// Modified addURL function to include sync
+// Add safe JSON parsing helper
+function safeJSONParse(data, defaultValue = []) {
+    if (!data) return defaultValue;
+    try {
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('JSON Parse error:', error);
+        return defaultValue;
+    }
+}
+
+// Add the missing updateBookmarksList function
+function updateBookmarksList(bookmarks) {
+    const bookmarksList = document.getElementById('bookmarks-list');
+    if (!bookmarksList) return;
+    
+    bookmarksList.innerHTML = '';
+    
+    if (!Array.isArray(bookmarks) || bookmarks.length === 0) {
+        bookmarksList.innerHTML = '<p>No bookmarks yet</p>';
+        return;
+    }
+
+    bookmarks.forEach(bookmark => {
+        if (!bookmark || !bookmark.url) return;
+        
+        const bookmarkElement = document.createElement('div');
+        bookmarkElement.className = 'bookmark-item';
+        
+        const favicon = `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}`;
+        
+        bookmarkElement.innerHTML = `
+            <img src="${favicon}" alt="favicon" class="favicon">
+            <a href="${bookmark.url}" target="_blank">${bookmark.url}</a>
+            <span class="category">${bookmark.category || 'Uncategorized'}</span>
+            <span class="hashtags">${bookmark.hashtags ? bookmark.hashtags.join(', ') : ''}</span>
+            <button onclick="togglePin('${bookmark.url}')" class="pin-button">
+                ${bookmark.pinned ? '📌' : '📍'}
+            </button>
+            <button onclick="deleteURL('${bookmark.url}')" class="delete-button">🗑️</button>
+        `;
+        
+        bookmarksList.appendChild(bookmarkElement);
+    });
+}
+
+// Modify addURL function
 function addURL() {
     const urlInput = document.getElementById('url-input');
     const categoryInput = document.getElementById('category-input');
@@ -113,8 +159,9 @@ function addURL() {
         showNotification('Please enter a URL', 'error');
         return;
     }
-
-    const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    
+    const bookmarks = safeJSONParse(localStorage.getItem(STORAGE_KEY), []);
+    
     const newBookmark = {
         url: urlInput.value,
         category: categoryInput.value || 'Uncategorized',
@@ -122,18 +169,7 @@ function addURL() {
         pinned: false,
         dateAdded: new Date().toISOString()
     };
-
-    const currentToken = localStorage.getItem(TOKEN_KEY);
-    if (currentToken) {
-        const tokenSpace = JSON.parse(localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`) || '{"bookmarks":[]}');
-        tokenSpace.bookmarks.push(newBookmark);
-        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(tokenSpace));
-        
-        if (getCookie('cookie_consent') === 'accepted') {
-            setCookie(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(tokenSpace));
-        }
-    }
-
+    
     bookmarks.push(newBookmark);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
     
@@ -141,7 +177,7 @@ function addURL() {
     urlInput.value = '';
     categoryInput.value = '';
     hashtagsInput.value = '';
-
+    
     // Update UI
     loadURLs();
     updatePinnedLinks(bookmarks);
@@ -210,25 +246,16 @@ window.addEventListener('storage', (e) => {
     }
 });
 
-// Add safe JSON parsing helper
-function safeJSONParse(data, defaultValue = []) {
-    try {
-        return data ? JSON.parse(data) : defaultValue;
-    } catch (error) {
-        console.error('JSON Parse error:', error);
-        return defaultValue;
-    }
-}
-
-// Modify loadURLs function to handle undefined data
+// Modify loadURLs function
 function loadURLs() {
     try {
-        const storedData = localStorage.getItem(STORAGE_KEY);
-        const bookmarks = safeJSONParse(storedData, []);
+        const bookmarks = safeJSONParse(localStorage.getItem(STORAGE_KEY), []);
         updateBookmarksList(bookmarks);
+        updatePinnedLinks(bookmarks);
     } catch (error) {
         console.error('Load URLs error:', error);
         updateBookmarksList([]);
+        updatePinnedLinks([]);
     }
 }
 
@@ -589,128 +616,4 @@ function createTokenSpace(token) {
     // Set up separate storage for this token
     localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(tokenSpace));
     if (getCookie('cookie_consent') === 'accepted') {
-        setCookie(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(tokenSpace));
-    }
-    return tokenSpace;
-}
-
-// Add this function after the showNotification function
-function hideGuide() {
-    const guide = document.querySelector('.quick-start-guide');
-    if (guide) {
-        guide.style.display = 'none';
-        localStorage.setItem('hideGuide', 'true');
-    }
-}
-
-// Add this cookie management system
-function setCookie(name, value) {
-    // Set a very far future date (effectively never expires)
-    const farFuture = new Date();
-    farFuture.setFullYear(farFuture.getFullYear() + 100); // 100 years from now
-    const expires = "expires=" + farFuture.toUTCString();
-    document.cookie = name + "=" + value + ";" + expires + ";path=/";
-}
-
-function getCookie(name) {
-    const nameEQ = name + "=";
-    const ca = document.cookie.split(';');
-    for(let i = 0; i < ca.length; i++) {
-        let c = ca[i];
-        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-    }
-    return null;
-}
-
-function deleteCookie(name) {
-    document.cookie = name + '=; Max-Age=-99999999;';
-}
-
-// Add cookie consent check
-function checkCookieConsent() {
-    const consent = getCookie('cookie_consent');
-    if (!consent) {
-        const notification = document.createElement('div');
-        notification.className = 'cookie-consent';
-        notification.innerHTML = `
-            <p>This site uses cookies to improve your experience. 
-               Do you accept cookies for better storage?</p>
-            <button onclick="acceptCookies()">Accept</button>
-            <button onclick="declineCookies()">Decline</button>
-        `;
-        document.body.appendChild(notification);
-    }
-    return consent === 'accepted';
-}
-
-function acceptCookies() {
-    setCookie('cookie_consent', 'accepted');
-    document.querySelector('.cookie-consent')?.remove();
-    // Transfer current localStorage to cookies
-    syncToCookies();
-}
-
-function declineCookies() {
-    setCookie('cookie_consent', 'declined');
-    document.querySelector('.cookie-consent')?.remove();
-}
-
-function syncToCookies() {
-    if (getCookie('cookie_consent') === 'accepted') {
-        const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        setCookie(STORAGE_KEY, JSON.stringify(bookmarks));
-        
-        // Sync other important data
-        const token = localStorage.getItem(TOKEN_KEY);
-        if (token) setCookie(TOKEN_KEY, token);
-        
-        const deviceId = localStorage.getItem('device_id');
-        if (deviceId) setCookie('device_id', deviceId);
-    }
-}
-
-// Modify existing storage functions to use both localStorage and cookies
-const originalSetItem = localStorage.setItem;
-localStorage.setItem = function(key, value) {
-    originalSetItem.apply(this, arguments);
-    if (getCookie('cookie_consent') === 'accepted') {
-        setCookie(key, value);
-    }
-};
-
-const originalGetItem = localStorage.getItem;
-localStorage.getItem = function(key) {
-    const localValue = originalGetItem.apply(this, arguments);
-    if (getCookie('cookie_consent') === 'accepted') {
-        const cookieValue = getCookie(key);
-        return localValue || cookieValue;
-    }
-    return localValue;
-};
-
-// Add cookie consent functions
-function showCookieConsent() {
-    const consentContainer = document.createElement('div');
-    consentContainer.className = 'cookie-consent';
-    consentContainer.innerHTML = `
-        <div class="cookie-content">
-            <p>🍪 This site uses cookies to improve your experience and sync preferences.</p>
-            <div class="cookie-buttons">
-                <button onclick="acceptCookies()" class="accept-button">Accept Cookies</button>
-                <button onclick="declineCookies()" class="decline-button">Decline</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(consentContainer);
-}
-
-function acceptCookies() {
-    localStorage.setItem('cookieConsent', 'accepted');
-    document.querySelector('.cookie-consent')?.remove();
-}
-
-function declineCookies() {
-    localStorage.setItem('cookieConsent', 'declined');
-    document.querySelector('.cookie-consent')?.remove();
-} 
+        setCookie(`
