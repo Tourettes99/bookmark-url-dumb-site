@@ -1,10 +1,19 @@
-// Local storage key for our bookmarks
+// Constants
 const STORAGE_KEY = 'url_bookmarks';
 
-// Initialize storage if empty
-if (!localStorage.getItem(STORAGE_KEY)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-}
+// Initialize storage when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize storage if empty
+    if (!localStorage.getItem(STORAGE_KEY)) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    }
+    
+    // Load existing URLs
+    loadURLs();
+    
+    // Add event listeners
+    document.getElementById('search-input')?.addEventListener('input', searchLinks);
+});
 
 // Using WebSocket for real-time communication
 const socket = new WebSocket('ws://localhost:3000');
@@ -51,7 +60,6 @@ channel.bind('new-bookmark', function(data) {
     }
 });
 
-// Update addURL function
 function addURL(event) {
     if (event) event.preventDefault();
     
@@ -61,74 +69,89 @@ function addURL(event) {
     
     if (!urlInput.value) return;
 
-    const urlData = {
-        url: urlInput.value,
-        category: categoryInput.value,
-        hashtags: hashtagsInput.value.split(',').map(tag => tag.trim()),
-        timestamp: new Date().getTime(),
-        userId: getCurrentUserId(),
-        pinned: false
-    };
+    try {
+        // Validate URL
+        new URL(urlInput.value);
 
-    // Save to localStorage
-    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    urls.push(urlData);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
+        const urlData = {
+            url: urlInput.value,
+            category: categoryInput.value,
+            hashtags: hashtagsInput.value ? hashtagsInput.value.split(',').map(tag => tag.trim()) : [],
+            timestamp: new Date().getTime(),
+            pinned: false
+        };
 
-    // Show notification
-    showNotification(urlData, false);
-    
-    // Clear inputs
-    clearInputs();
-    
-    // Reload URLs
-    loadURLs();
+        // Get existing URLs and add new one
+        const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        urls.push(urlData);
+        
+        // Save back to localStorage
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
 
-    // Send to WebSocket
-    socket.send(JSON.stringify({
-        type: 'new_bookmark',
-        userId: getCurrentUserId(),
-        data: urlData
-    }));
-}
+        // Clear inputs
+        urlInput.value = '';
+        categoryInput.value = '';
+        hashtagsInput.value = '';
 
-function clearInputs() {
-    document.getElementById('url-input').value = '';
-    document.getElementById('category-input').value = '';
-    document.getElementById('hashtags-input').value = '';
+        // Reload URLs
+        loadURLs();
+
+        showNotification('URL added successfully!');
+    } catch (e) {
+        showNotification('Please enter a valid URL', 'error');
+    }
 }
 
 function loadURLs() {
     const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
     
-    // Load pinned links into sidebar
+    // Load pinned links
     const pinnedLinksContainer = document.getElementById('pinned-links');
-    pinnedLinksContainer.innerHTML = '';
-    
-    urls.filter(url => url.pinned).forEach(url => {
-        const pinnedDiv = document.createElement('div');
-        pinnedDiv.className = 'pinned-link';
+    if (pinnedLinksContainer) {
+        pinnedLinksContainer.innerHTML = '';
         
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}`;
+        const pinnedUrls = urls.filter(url => url.pinned);
         
-        pinnedDiv.innerHTML = `
-            <a href="${url.url}" target="_blank">
-                <img src="${faviconUrl}" class="favicon" alt="favicon">
-                <span>${new URL(url.url).hostname}</span>
-            </a>
-        `;
-        
-        pinnedLinksContainer.appendChild(pinnedDiv);
-    });
-    
-    // Load all URLs into main container
+        if (pinnedUrls.length === 0) {
+            pinnedLinksContainer.innerHTML = '<div class="no-pins">No pinned links yet</div>';
+        } else {
+            pinnedUrls.forEach(url => {
+                const pinnedDiv = document.createElement('div');
+                pinnedDiv.className = 'pinned-link';
+                
+                try {
+                    const urlObj = new URL(url.url);
+                    const faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}`;
+                    
+                    pinnedDiv.innerHTML = `
+                        <a href="${url.url}" target="_blank">
+                            <img src="${faviconUrl}" class="favicon" alt="favicon">
+                            <span>${urlObj.hostname}</span>
+                        </a>
+                    `;
+                    
+                    pinnedLinksContainer.appendChild(pinnedDiv);
+                } catch (e) {
+                    console.error('Error processing URL:', url, e);
+                }
+            });
+        }
+    }
+
+    // Load all URLs
     const urlsContainer = document.getElementById('urls-container');
-    urlsContainer.innerHTML = '';
-    
-    urls.forEach(url => {
-        const urlElement = createURLElement(url);
-        urlsContainer.appendChild(urlElement);
-    });
+    if (urlsContainer) {
+        urlsContainer.innerHTML = '';
+        
+        if (urls.length === 0) {
+            urlsContainer.innerHTML = '<div class="no-urls">No bookmarks yet</div>';
+        } else {
+            urls.forEach(url => {
+                const urlElement = createURLElement(url);
+                urlsContainer.appendChild(urlElement);
+            });
+        }
+    }
 }
 
 function displayURLs(urls) {
