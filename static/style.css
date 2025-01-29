@@ -446,6 +446,21 @@ button:hover {
     .sidebar {
         top: 0;
     }
+
+    .empty-state {
+        text-align: center;
+        padding: 20px;
+        color: var(--text-gray);
+        border: 1px solid var(--orange);
+        border-radius: 8px;
+        margin: 20px 20px 20px 280px; /* Increased left margin to move text right */
+        background-color: rgba(255, 87, 34, 0.05);
+    }
+
+    /* Ensure proper spacing with sidebar */
+    .main-content {
+        margin-left: 270px;
+    }
 }
 
 /* Main container */
@@ -533,4 +548,4 @@ button:hover {
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.9em;
-} 
+}
