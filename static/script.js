@@ -62,15 +62,13 @@ function createURLCard(urlData) {
     
     card.innerHTML = `
         <button class="pin-button" onclick="togglePin('${urlData.url}')">
-            <i class="fas ${urlData.pinned ? 'fa-thumbtack' : 'fa-thumbtack'}"></i>
+            ${urlData.pinned ? '📌' : '📍'}
         </button>
-        <div class="url-title">
-            <a href="${urlData.url}" target="_blank">
-                <img src="${faviconUrl}" class="favicon" alt="favicon">
-                ${urlData.url}
-            </a>
-        </div>
-        <div class="category">Category: ${urlData.category}</div>
+        <a href="${urlData.url}" target="_blank">
+            <img src="${faviconUrl}" class="favicon" alt="favicon">
+            <span class="url-title">${urlData.url}</span>
+        </a>
+        <div class="category">${urlData.category}</div>
         <div class="hashtags">
             ${hashtags.map(tag => `<span class="hashtag">#${tag}</span>`).join('')}
         </div>
@@ -81,9 +79,21 @@ function createURLCard(urlData) {
 
 function updatePinnedLinks(urls) {
     const pinnedContainer = document.getElementById('pinned-links');
+    if (!pinnedContainer) {
+        console.error('Pinned links container not found!');
+        return;
+    }
+    
     pinnedContainer.innerHTML = '';
+    
+    const pinnedUrls = urls.filter(url => url.pinned);
+    
+    if (pinnedUrls.length === 0) {
+        pinnedContainer.innerHTML = '<div class="no-pins">No pinned links yet</div>';
+        return;
+    }
 
-    urls.filter(url => url.pinned).forEach(url => {
+    pinnedUrls.forEach(url => {
         const link = document.createElement('div');
         const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}`;
         
@@ -99,12 +109,14 @@ function updatePinnedLinks(urls) {
 }
 
 function togglePin(url) {
-    const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    const bookmark = bookmarks.find(b => b.url === url);
-    if (bookmark) {
-        bookmark.pinned = !bookmark.pinned;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
-        loadURLs();
+    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const urlIndex = urls.findIndex(u => u.url === url);
+    
+    if (urlIndex !== -1) {
+        urls[urlIndex].pinned = !urls[urlIndex].pinned;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
+        displayURLs(urls);
+        updatePinnedLinks(urls);
     }
 }
 
@@ -149,4 +161,7 @@ function importFromExcel(event) {
 }
 
 // Load URLs when page loads
-document.addEventListener('DOMContentLoaded', loadURLs); 
+document.addEventListener('DOMContentLoaded', () => {
+    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    updatePinnedLinks(urls);
+}); 
