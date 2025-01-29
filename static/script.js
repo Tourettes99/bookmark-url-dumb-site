@@ -363,15 +363,45 @@ function handleSyncUpdate(data) {
         const token = localStorage.getItem(TOKEN_KEY);
         if (!token) return;
 
-        // Update both storages regardless of source
-        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(data.bookmarks));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
+        // Merge existing and new bookmarks to prevent duplicates
+        const existingBookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        const newBookmarks = data.bookmarks;
+        
+        // Create a map of URLs to detect duplicates
+        const urlMap = new Map();
+        
+        // Add existing bookmarks to map (keeping the most recent version)
+        existingBookmarks.forEach(bookmark => {
+            if (bookmark && bookmark.url) {
+                urlMap.set(bookmark.url, bookmark);
+            }
+        });
+        
+        // Update or add new bookmarks
+        newBookmarks.forEach(bookmark => {
+            if (bookmark && bookmark.url) {
+                const existing = urlMap.get(bookmark.url);
+                if (!existing || new Date(bookmark.dateAdded) > new Date(existing.dateAdded)) {
+                    urlMap.set(bookmark.url, bookmark);
+                }
+            }
+        });
+        
+        // Convert map back to array
+        const mergedBookmarks = Array.from(urlMap.values());
+        
+        // Sort by date added (newest first)
+        mergedBookmarks.sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
+        
+        // Update both storages
+        const bookmarksString = JSON.stringify(mergedBookmarks);
+        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, bookmarksString);
+        localStorage.setItem(STORAGE_KEY, bookmarksString);
         
         // Update UI
-        loadURLs();
-        updatePinnedLinks(data.bookmarks);
+        displayURLs(mergedBookmarks);
+        updatePinnedLinks(mergedBookmarks);
         
-        // Show sync notification
         showNotification('Synced with other devices', 'success');
         updateSyncProgress(100, 'Sync completed', SYNC_STATES.COMPLETED);
     } catch (error) {
@@ -443,7 +473,7 @@ function loadURLs() {
 function displayURLs(urls) {
     const urlsContainer = document.getElementById('urls-container');
     if (!urlsContainer) return;
-
+    
     // Clear existing content
     urlsContainer.innerHTML = '';
     
@@ -458,7 +488,16 @@ function displayURLs(urls) {
     // Sort URLs by date added (newest first)
     urlsArray.sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
 
-    urlsArray.forEach(url => {
+    // Remove duplicates based on URL
+    const uniqueUrls = urlsArray.reduce((acc, current) => {
+        const exists = acc.find(item => item.url === current.url);
+        if (!exists) {
+            acc.push(current);
+        }
+        return acc;
+    }, []);
+
+    uniqueUrls.forEach(url => {
         const card = createURLElement(url);
         if (card) urlsContainer.appendChild(card);
     });
