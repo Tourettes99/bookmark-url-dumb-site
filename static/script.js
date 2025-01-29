@@ -1,12 +1,15 @@
 // Constants
-const STORAGE_KEY = 'teachmode_bookmarks';
-const SYNC_INTERVAL = 30000; // 30 seconds
-const TOKEN_KEY = 'teachmode_user_token';
-const TOKEN_STORAGE_PREFIX = 'teachmode_data_';
+if (typeof TOKEN_STORAGE_PREFIX === 'undefined') {
+    const TOKEN_STORAGE_PREFIX = 'bookmarks_token_';
+}
+if (typeof STORAGE_KEY === 'undefined') {
+    const STORAGE_KEY = 'urls';
+}
+if (typeof TOKEN_KEY === 'undefined') {
+    const TOKEN_KEY = 'sync_token';
+}
 
-// Add these constants at the top of your file with other constants
-const TOKEN_STORAGE_PREFIX = 'bookmarks_token_';
-const TOKEN_KEY = 'sync_token';
+const SYNC_INTERVAL = 30000; // 30 seconds
 
 // Initialize storage when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -95,29 +98,36 @@ function addURL() {
     const categoryInput = document.getElementById('category-input');
     const hashtagsInput = document.getElementById('hashtags-input');
     
-    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    const newUrl = {
+    if (!urlInput.value) {
+        showNotification('Please enter a URL', 'error');
+        return;
+    }
+
+    const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const newBookmark = {
         url: urlInput.value,
-        category: categoryInput.value,
-        hashtags: hashtagsInput.value.split(',').map(tag => tag.trim()),
+        category: categoryInput.value || 'Uncategorized',
+        hashtags: hashtagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag),
         pinned: false,
         dateAdded: new Date().toISOString()
     };
-    
-    urls.push(newUrl);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
-    
-    // Sync changes
-    syncChanges(urls);
-    
-    // Update UI
-    loadURLs();
-    updatePinnedLinks(urls);
+
+    bookmarks.push(newBookmark);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
     
     // Clear inputs
     urlInput.value = '';
     categoryInput.value = '';
     hashtagsInput.value = '';
+
+    // Update UI
+    loadURLs();
+    updatePinnedLinks(bookmarks);
+    
+    // Sync changes if enabled
+    syncChanges(bookmarks);
+    
+    showNotification('URL added successfully', 'success');
 }
 
 // Sync changes to other devices
