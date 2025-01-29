@@ -311,25 +311,55 @@ button:hover {
     gap: 10px;
 }
 
-/* Empty state styling */
+/* Common styles for empty state container */
+#urls-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
 .empty-state {
     text-align: center;
     padding: 20px;
     color: var(--text-gray);
     border: 1px solid var(--orange);
     border-radius: 8px;
-    margin: 20px 40px;  /* Increased left and right margin */
+    width: 80%;  /* Control the width of the message */
     background-color: rgba(255, 87, 34, 0.05);
 }
 
-.empty-state p {
-    margin: 0;
-    font-size: 16px;
-    opacity: 0.8;
+/* Desktop specific styles */
+@media screen and (min-width: 769px) {
+    .empty-state {
+        margin: 20px auto;  /* Center horizontally */
+        max-width: 500px;   /* Maximum width on desktop */
+    }
 }
 
-/* Mobile specific updates for bottom pinned bar */
+/* Mobile specific styles */
 @media screen and (max-width: 768px) {
+    .empty-state {
+        margin: 10px auto;  /* Smaller margins on mobile */
+        width: 90%;        /* Slightly wider on mobile */
+    }
+
+    .no-pins {
+        text-align: center;
+        padding: 8px;
+        color: var(--text-gray);
+        width: 80%;
+        margin: 8px auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 32px;
+        border: 1px solid var(--orange);
+        border-radius: 4px;
+        background-color: rgba(255, 92, 40, 0.1);
+        font-size: 0.9em;
+    }
+
     .sidebar {
         width: 100%;
         height: auto;
@@ -362,23 +392,6 @@ button:hover {
         min-height: 40px;
         display: flex;
         align-items: center;
-    }
-
-    /* Style for "No pinned links yet" message */
-    .no-pins {
-        text-align: center;
-        padding: 8px;
-        color: var(--text-gray);
-        width: 90%;
-        margin: 8px auto;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 32px;
-        border: 1px solid var(--orange);
-        border-radius: 4px;
-        background-color: rgba(255, 92, 40, 0.1);
-        font-size: 0.9em;
     }
 
     .main-content {
