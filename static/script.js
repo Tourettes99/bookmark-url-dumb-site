@@ -99,9 +99,36 @@ function clearInputs() {
 }
 
 function loadURLs() {
-    const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    displayURLs(bookmarks);
-    updatePinnedLinks(bookmarks);
+    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    
+    // Load pinned links into sidebar
+    const pinnedLinksContainer = document.getElementById('pinned-links');
+    pinnedLinksContainer.innerHTML = '';
+    
+    urls.filter(url => url.pinned).forEach(url => {
+        const pinnedDiv = document.createElement('div');
+        pinnedDiv.className = 'pinned-link';
+        
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}`;
+        
+        pinnedDiv.innerHTML = `
+            <a href="${url.url}" target="_blank">
+                <img src="${faviconUrl}" class="favicon" alt="favicon">
+                <span>${new URL(url.url).hostname}</span>
+            </a>
+        `;
+        
+        pinnedLinksContainer.appendChild(pinnedDiv);
+    });
+    
+    // Load all URLs into main container
+    const urlsContainer = document.getElementById('urls-container');
+    urlsContainer.innerHTML = '';
+    
+    urls.forEach(url => {
+        const urlElement = createURLElement(url);
+        urlsContainer.appendChild(urlElement);
+    });
 }
 
 function displayURLs(urls) {
@@ -230,10 +257,8 @@ function importFromExcel(event) {
 }
 
 // Load URLs when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    displayURLs(urls);
-    updatePinnedLinks(urls);
+document.addEventListener('DOMContentLoaded', function() {
+    loadURLs();
 });
 
 function showNotification(urlData, isRemote) {
