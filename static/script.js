@@ -194,12 +194,14 @@ function addURL() {
         // Validate URL
         new URL(urlInput.value);
         
-        // Ensure urls is an array by using safeJSONParse
-        const urls = safeJSONParse(localStorage.getItem(STORAGE_KEY), []);
-        
-        // Verify urls is an array before proceeding
-        if (!Array.isArray(urls)) {
-            throw new Error('Storage data is corrupted');
+        // Get existing URLs and ensure it's an array
+        let urls = [];
+        try {
+            const storedUrls = localStorage.getItem(STORAGE_KEY);
+            urls = storedUrls ? JSON.parse(storedUrls) : [];
+            if (!Array.isArray(urls)) urls = [];
+        } catch (e) {
+            urls = [];
         }
         
         const newUrl = {
@@ -693,18 +695,20 @@ function syncWithToken() {
         const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`);
         if (tokenData) {
             try {
-                const bookmarks = JSON.parse(tokenData);
-                if (Array.isArray(bookmarks)) {
-                    localStorage.setItem(STORAGE_KEY, tokenData);
-                    loadURLs();
-                    updatePinnedLinks(bookmarks);
-                    showNotification('Successfully synced with existing data', 'success');
-                } else {
-                    throw new Error('Invalid bookmark data format');
-                }
+                const parsedData = JSON.parse(tokenData);
+                const bookmarks = Array.isArray(parsedData) ? parsedData : 
+                                (parsedData && Array.isArray(parsedData.data) ? parsedData.data : []);
+                
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+                loadURLs();
+                updatePinnedLinks(bookmarks);
+                showNotification('Successfully synced with existing data', 'success');
             } catch (parseError) {
                 console.error('Parse error:', parseError);
-                showNotification('Error: Invalid bookmark data', 'error');
+                // Initialize with empty array on parse error
+                localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+                loadURLs();
+                showNotification('Started fresh sync token', 'info');
             }
         } else {
             // Initialize empty storage for new token
