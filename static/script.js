@@ -412,13 +412,13 @@ function updateUI() {
 // Modify loadURLs function for immediate loading
 function loadURLs() {
     try {
-        // Get data from storage
-        const urls = localStorage.getItem(STORAGE_KEY);
-        const parsedUrls = urls ? JSON.parse(urls) : [];
+        // Get data from storage with default empty array
+        const urls = localStorage.getItem(STORAGE_KEY) || '[]';
+        const parsedUrls = JSON.parse(urls);
         
         // Ensure we have an array
         if (!Array.isArray(parsedUrls)) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+            localStorage.setItem(STORAGE_KEY, '[]');
             displayURLs([]);
             updatePinnedLinks([]);
             return;
@@ -430,7 +430,10 @@ function loadURLs() {
         
     } catch (error) {
         console.error('Load URLs error:', error);
-        displayURLs([]); // Pass empty array on error
+        // Set default empty array on error
+        localStorage.setItem(STORAGE_KEY, '[]');
+        displayURLs([]); 
+        updatePinnedLinks([]);
     }
 }
 
@@ -1161,7 +1164,6 @@ async function trackSyncPerformance(token, operation) {
 
 async function addURLAndSync() {
     try {
-        // First add the URL
         const urlInput = document.getElementById('url-input');
         const categoryInput = document.getElementById('category-input');
         const hashtagsInput = document.getElementById('hashtags-input');
@@ -1182,8 +1184,9 @@ async function addURLAndSync() {
             dateAdded: new Date().toISOString()
         };
         
-        // Get existing URLs
-        let urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        // Get existing URLs with default empty array
+        const storedUrls = localStorage.getItem(STORAGE_KEY) || '[]';
+        let urls = JSON.parse(storedUrls);
         if (!Array.isArray(urls)) urls = [];
         
         urls.push(newUrl);
