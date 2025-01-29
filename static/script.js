@@ -228,35 +228,21 @@ function addURL() {
 
 // Sync changes to other devices
 function syncChanges(bookmarks) {
-    const userToken = localStorage.getItem(TOKEN_KEY);
-    if (!userToken) return;
-
-    try {
-        // Update both storages with stringified data
-        const bookmarksString = JSON.stringify(bookmarks);
-        localStorage.setItem(STORAGE_KEY, bookmarksString);
-        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${userToken}`, bookmarksString);
-
-        // Force reload URLs after sync
-        loadURLs();
-
-        // Send update to other devices
-        fetch('/.netlify/functions/sync-bookmarks', {
+    syncQueue.add(async () => {
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) return;
+        
+        const versionedData = await versionedSync(token, bookmarks);
+        await fetch('/.netlify/functions/sync-bookmarks', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 source: getDeviceId(),
-                token: userToken,
-                bookmarks: bookmarks
+                token: token,
+                bookmarks: versionedData
             })
-        }).catch(error => {
-            console.error('Failed to broadcast changes:', error);
-            showNotification('Failed to sync with other devices', 'error');
         });
-    } catch (error) {
-        console.error('Error in syncChanges:', error);
-        showNotification('Failed to save changes', 'error');
-    }
+    });
 }
 
 // Modified togglePin function to include sync
@@ -841,3 +827,136 @@ function getCookie(name) {
     }
     return null;
 }
+
+// Add this helper function for unified storage handling
+function syncStorages(token, data) {
+    const tokenKey = `${TOKEN_STORAGE_PREFIX}${token}`;
+    const dataString = JSON.stringify(data);
+    
+    // Browser Storage
+    localStorage.setItem(STORAGE_KEY, dataString);
+    localStorage.setItem(tokenKey, dataString);
+    
+    // Cookie Storage
+    if (getCookie('cookie_consent') === 'accepted') {
+        setCookie(tokenKey, dataString, 30); // 30 days expiry
+        setCookie(STORAGE_KEY, dataString, 30);
+    }
+    
+    return true;
+}
+
+// Add this function to handle sync conflicts
+function resolveStorageConflicts(token) {
+    const localData = localStorage.getItem(STORAGE_KEY);
+    const cookieData = getCookie(STORAGE_KEY);
+    const tokenLocalData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
+    const tokenCookieData = getCookie(`${TOKEN_STORAGE_PREFIX}${token}`);
+    
+    // Parse all data sources with timestamps
+    const dataSources = [
+        { source: 'local', data: safeJSONParse(localData), timestamp: localStorage.getItem('last_sync_local') },
+        { source: 'cookie', data: safeJSONParse(cookieData), timestamp: getCookie('last_sync_cookie') },
+        { source: 'tokenLocal', data: safeJSONParse(tokenLocalData), timestamp: localStorage.getItem(`last_sync_${token}`) },
+        { source: 'tokenCookie', data: safeJSONParse(tokenCookieData), timestamp: getCookie(`last_sync_${token}`) }
+    ].filter(source => source.data && source.timestamp);
+    
+    // Get most recent data
+    const mostRecent = dataSources.reduce((prev, current) => {
+        return (current.timestamp > prev.timestamp) ? current : prev;
+    });
+    
+    return mostRecent.data;
+}
+
+// Add version control to sync data
+function versionedSync(token, data) {
+    const version = parseInt(localStorage.getItem(`${token}_version`) || '0') + 1;
+    const syncData = {
+        version: version,
+        timestamp: Date.now(),
+        data: data,
+        deviceId: getDeviceId()
+    };
+    
+    localStorage.setItem(`${token}_version`, version.toString());
+    return syncStorages(token, syncData);
+}
+
+function validateStorage(token) {
+    const healthCheck = {
+        localStorage: {
+            available: false,
+            size: 0,
+            quota: 0
+        },
+        cookieStorage: {
+            available: false,
+            enabled: false
+        }
+    };
+    
+    try {
+        // Test localStorage
+        const testKey = `test_${Date.now()}`;
+        localStorage.setItem(testKey, '1');
+        localStorage.removeItem(testKey);
+        healthCheck.localStorage.available = true;
+        
+        // Estimate storage usage
+        healthCheck.localStorage.size = new Blob(
+            Object.keys(localStorage).map(key => localStorage[key])
+        ).size;
+        
+        // Check cookies
+        healthCheck.cookieStorage.enabled = navigator.cookieEnabled;
+        healthCheck.cookieStorage.available = document.cookie !== '';
+        
+        return healthCheck;
+    } catch (error) {
+        console.error('Storage health check failed:', error);
+        return healthCheck;
+    }
+}
+
+const syncQueue = {
+    queue: [],
+    processing: false,
+    
+    add: function(syncOperation) {
+        this.queue.push(syncOperation);
+        if (!this.processing) {
+            this.process();
+        }
+    },
+    
+    process: async function() {
+        if (this.queue.length === 0) {
+            this.processing = false;
+            return;
+        }
+        
+        this.processing = true;
+        const operation = this.queue.shift();
+        
+        try {
+            await operation();
+        } catch (error) {
+            console.error('Sync operation failed:', error);
+            // Retry failed operations
+            if (operation.retries < 3) {
+                operation.retries = (operation.retries || 0) + 1;
+                this.queue.unshift(operation);
+            }
+        }
+        
+        this.process();
+    }
+};
+
+setInterval(() => {
+    const health = validateStorage(currentToken);
+    if (!health.localStorage.available) {
+        showNotification('Local storage is not available', 'error');
+    }
+}, 300000); // Every 5 minutes
