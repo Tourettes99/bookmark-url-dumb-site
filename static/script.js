@@ -90,9 +90,10 @@ function updatePinnedLinks(urls) {
         link.innerHTML = `
             <a href="${url.url}" target="_blank">
                 <img src="${faviconUrl}" class="favicon" alt="favicon">
-                ${url.url}
+                ${new URL(url.url).hostname}
             </a>
         `;
+        link.className = 'pinned-link';
         pinnedContainer.appendChild(link);
     });
 }
