@@ -616,4 +616,22 @@ function createTokenSpace(token) {
     // Set up separate storage for this token
     localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(tokenSpace));
     if (getCookie('cookie_consent') === 'accepted') {
-        setCookie(`
+        setCookie(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(tokenSpace));
+    }
+    return tokenSpace;
+}
+
+// Add this function to fetch existing bookmarks for a token
+function fetchExistingBookmarks(token) {
+    // Implementation of fetchExistingBookmarks function
+}
+
+// Add this function to get cookie
+function getCookie(name) {
+    // Implementation of getCookie function
+}
+
+// Add this function to set cookie
+function setCookie(name, value) {
+    // Implementation of setCookie function
+}
