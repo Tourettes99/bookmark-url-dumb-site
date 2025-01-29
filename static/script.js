@@ -168,31 +168,40 @@ function createURLElement(urlData) {
     const div = document.createElement('div');
     div.className = 'url-card';
     
-    const url = new URL(urlData.url);
-    const faviconUrl = `https://www.google.com/s2/favicons?domain=${url.hostname}`;
-    
-    const hashtags = Array.isArray(urlData.hashtags) 
-        ? urlData.hashtags 
-        : urlData.hashtags.split(',').map(tag => tag.trim());
-    
-    const hashtagsHtml = hashtags
-        .filter(tag => tag)
-        .map(tag => `<span class="hashtag">#${tag}</span>`)
-        .join('');
-    
-    div.innerHTML = `
-        <div class="url-title">
-            <img src="${faviconUrl}" class="favicon" alt="favicon">
-            <a href="${urlData.url}" target="_blank">${url.hostname}</a>
-            <button class="pin-button" onclick="togglePin('${urlData.url}')">
-                ${urlData.pinned ? '📌' : '📍'}
-            </button>
-        </div>
-        ${urlData.category ? `<div class="category">${urlData.category}</div>` : ''}
-        <div class="hashtags">
-            ${hashtagsHtml}
-        </div>
-    `;
+    try {
+        const url = new URL(urlData.url);
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${url.hostname}`;
+        
+        const hashtags = Array.isArray(urlData.hashtags) 
+            ? urlData.hashtags 
+            : urlData.hashtags.split(',').map(tag => tag.trim());
+        
+        const hashtagsHtml = hashtags
+            .filter(tag => tag)
+            .map(tag => `<span class="hashtag">#${tag}</span>`)
+            .join('');
+        
+        div.innerHTML = `
+            <div class="url-title">
+                <img src="${faviconUrl}" class="favicon" alt="favicon">
+                <a href="${urlData.url}" target="_blank">${url.hostname}</a>
+                <div class="url-actions">
+                    <button class="pin-button" onclick="togglePin('${urlData.url}')">
+                        ${urlData.pinned ? '📌' : '📍'}
+                    </button>
+                    <button class="delete-button" onclick="deleteURL('${urlData.url}')">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+            ${urlData.category ? `<div class="category">${urlData.category}</div>` : ''}
+            <div class="hashtags">
+                ${hashtagsHtml}
+            </div>
+        `;
+    } catch (e) {
+        console.error('Error creating URL element:', e);
+    }
     
     return div;
 }
@@ -314,4 +323,13 @@ function getCurrentUserId() {
 
 function getCurrentUserName() {
     return localStorage.getItem('userName') || 'Anonymous';
+}
+
+// Add this new function to handle deletion
+function deleteURL(url) {
+    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const updatedUrls = urls.filter(item => item.url !== url);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
+    loadURLs();
+    showNotification('URL deleted successfully!');
 } 
