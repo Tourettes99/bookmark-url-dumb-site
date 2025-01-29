@@ -121,6 +121,9 @@ function syncChanges(bookmarks) {
     const userToken = localStorage.getItem(TOKEN_KEY);
     if (!userToken) return;
 
+    // Update token-specific storage
+    localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${userToken}`, JSON.stringify(bookmarks));
+
     fetch('/.netlify/functions/sync-bookmarks', {
         method: 'POST',
         headers: {
@@ -491,6 +494,20 @@ function syncWithToken() {
         
         // Store token
         localStorage.setItem(TOKEN_KEY, inputToken);
+        
+        // Get existing bookmarks for this token from storage
+        const existingTokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`);
+        const existingBookmarks = existingTokenData ? JSON.parse(existingTokenData) : [];
+        
+        // Get current bookmarks
+        const currentBookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        
+        // Merge bookmarks, removing duplicates based on URL
+        const mergedBookmarks = mergeBookmarks(currentBookmarks, existingBookmarks);
+        
+        // Update local storage with merged bookmarks
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedBookmarks));
+        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify(mergedBookmarks));
         
         // Listen for updates from other devices
         channel.bind('sync-update', function(data) {
