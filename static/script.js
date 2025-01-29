@@ -22,34 +22,38 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initializePusher() {
     try {
         const response = await fetch('/.netlify/functions/get-pusher-config');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const config = await response.json();
         
-        window.PUSHER_KEY = config.key;
-        window.PUSHER_CLUSTER = config.cluster;
-        
         // Initialize Pusher with fetched credentials
-        window.pusher = new Pusher(PUSHER_KEY, {
-            cluster: PUSHER_CLUSTER,
+        window.pusher = new Pusher(config.key, {
+            cluster: config.cluster,
             encrypted: true
         });
         
-        // Set up channel subscription after initialization
-        const channel = pusher.subscribe('bookmarks-sync');
-        setupPusherListeners(channel);
+        // Check if there's an existing token and set up sync
+        const existingToken = localStorage.getItem(TOKEN_KEY);
+        if (existingToken) {
+            setupSyncForToken(existingToken);
+        }
         
+        showNotification('Sync service initialized', 'success');
     } catch (error) {
         console.error('Failed to initialize Pusher:', error);
-        showNotification('Failed to initialize sync service', 'error');
+        showNotification('Failed to initialize sync service. Please refresh the page.', 'error');
     }
 }
 
-// Separate function for Pusher event listeners
-function setupPusherListeners(channel) {
+function setupSyncForToken(token) {
+    const channel = pusher.subscribe(`sync-channel-${token}`);
     channel.bind('sync-update', function(data) {
         if (data.source !== getDeviceId()) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
             loadURLs();
             updatePinnedLinks(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []);
+            showNotification('Synced with other devices', 'success');
         }
     });
 }
