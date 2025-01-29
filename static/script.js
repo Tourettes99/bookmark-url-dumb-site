@@ -395,25 +395,39 @@ setInterval(syncWithExcel, SYNC_INTERVAL);
 // Sync immediately when page loads
 document.addEventListener('DOMContentLoaded', syncWithExcel);
 
-// Generate a unique token for the user
-function generateToken() {
-    const token = 'TMD_' + Math.random().toString(36).substring(2, 15) + 
-                 Math.random().toString(36).substring(2, 15);
+// Add this new function
+function copyToken() {
+    const tokenInput = document.getElementById('token-input');
+    tokenInput.select();
+    document.execCommand('copy');
     
-    // Save current data with the new token
-    const currentData = localStorage.getItem(STORAGE_KEY);
-    if (currentData) {
-        localStorage.setItem(TOKEN_STORAGE_PREFIX + token, currentData);
+    // Show notification
+    showNotification('Token copied to clipboard!', 'success');
+}
+
+// Modify the existing generateToken function
+function generateToken() {
+    const token = 'tm_' + Math.random().toString(36).substr(2, 9);
+    const tokenInput = document.getElementById('token-input');
+    tokenInput.value = token;
+    
+    // Show copy button after generating token
+    const copyButton = document.createElement('button');
+    copyButton.className = 'token-button copy-button';
+    copyButton.innerHTML = '📋 Copy';
+    copyButton.onclick = copyToken;
+    
+    // Remove existing copy button if any
+    const existingCopyButton = document.querySelector('.copy-button');
+    if (existingCopyButton) {
+        existingCopyButton.remove();
     }
     
-    // Show token to user
-    showNotification({
-        url: token,
-        category: 'Copy this token to sync your data across devices'
-    });
+    // Add new copy button
+    const tokenSection = document.querySelector('.token-section');
+    tokenSection.appendChild(copyButton);
     
-    localStorage.setItem(TOKEN_KEY, token);
-    return token;
+    showNotification('New sync token generated', 'success');
 }
 
 // Sync data using a token
