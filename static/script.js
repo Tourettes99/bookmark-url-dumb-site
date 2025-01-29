@@ -186,7 +186,7 @@ function addURL() {
     const hashtagsInput = document.getElementById('hashtags-input');
     
     if (!urlInput || !urlInput.value) {
-        showNotification('Error: Please enter a URL', 'error');
+        showNotification('Please enter a URL', 'error');
         return;
     }
 
@@ -194,9 +194,9 @@ function addURL() {
         // Validate URL
         new URL(urlInput.value);
         
-        const bookmarks = safeJSONParse(localStorage.getItem(STORAGE_KEY), []);
+        const urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         
-        const newBookmark = {
+        const newUrl = {
             url: urlInput.value,
             category: categoryInput.value || 'Uncategorized',
             hashtags: hashtagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag),
@@ -204,22 +204,22 @@ function addURL() {
             dateAdded: new Date().toISOString()
         };
         
-        bookmarks.push(newBookmark);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+        urls.push(newUrl);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
         
         // Clear inputs
         urlInput.value = '';
         categoryInput.value = '';
         hashtagsInput.value = '';
         
-        // Update UI
-        loadURLs();
-        updatePinnedLinks(bookmarks);
-        
-        // Sync changes if enabled
-        syncChanges(bookmarks);
+        // Update display
+        displayURLs(urls);
+        updatePinnedLinks(urls);
         
         showNotification('URL added successfully', 'success');
+        
+        // Sync if enabled
+        syncChanges(urls);
     } catch (error) {
         console.error('Add URL error:', error);
         showNotification('Error: Invalid URL format', 'error');
@@ -311,22 +311,23 @@ function loadURLs() {
 }
 
 function displayURLs(urls) {
-    const urlList = document.getElementById('url-list');
-    if (!urlList) return;
+    const urlsContainer = document.getElementById('urls-container');
+    if (!urlsContainer) return;
 
+    // Clear existing content
+    urlsContainer.innerHTML = '';
+    
     // Ensure urls is an array
     const urlsArray = Array.isArray(urls) ? urls : [];
     
-    urlList.innerHTML = '';
-    
     if (urlsArray.length === 0) {
-        urlList.innerHTML = '<p>No URLs found</p>';
+        urlsContainer.innerHTML = '<div class="empty-state">No URLs found</div>';
         return;
     }
 
     urlsArray.forEach(url => {
         const card = createURLElement(url);
-        urlList.appendChild(card);
+        urlsContainer.appendChild(card);
     });
 }
 
@@ -802,4 +803,14 @@ function getCookie(name) {
         return parts.pop().split(';').shift();
     }
     return null;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-gray);
+    border: 1px solid var(--orange);
+    border-radius: 8px;
+    margin: 20px;
+    background-color: rgba(255, 87, 34, 0.05);
 }
