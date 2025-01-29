@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teach Mode Dumber</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Main Title -->
+        <h1 class="title">Teach Mode<br>Dumber</h1>
+
+        <!-- URL Input Form -->
+        <form action="/add" method="POST">
+            <input type="text" class="input-field" name="url" placeholder="Enter URL" required>
+            <input type="text" class="input-field" name="category" placeholder="Category">
+            <input type="text" class="input-field" name="hashtags" placeholder="Hashtags (comma-separated)">
+            <button type="submit" class="button">Add URL</button>
+        </form>
+
+        <!-- Search Section -->
+        <div class="search-container">
+            <input type="text" class="input-field search-input" id="searchInput" 
+                   placeholder="Search by URL or hashtag...">
+            <button class="button" onclick="search()">Search</button>
+        </div>
+
+        <!-- Links Display Section -->
+        <div class="links-section">
+            {% for link in links %}
+            <div class="link-card">
+                <div class="link-info">
+                    <img src="{{ link.favicon }}" alt="favicon" width="20" height="20">
+                    <a href="{{ link.url }}">{{ link.domain }}</a>
+                    {% for tag in link.hashtags %}
+                    <span class="hashtag">#{{ tag }}</span>
+                    {% endfor %}
+                </div>
+                <div class="link-actions">
+                    <button onclick="pinLink('{{ link.id }}')" class="action-icon">📌</button>
+                    <button onclick="deleteLink('{{ link.id }}')" class="action-icon">🗑️</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Pinned Links Section -->
+    <div class="pinned-links">
+        <h3 class="pinned-links-title">Pinned Links</h3>
+        {% for pinned in pinned_links %}
+        <div class="link-card">
+            <img src="{{ pinned.favicon }}" alt="favicon" width="20" height="20">
+            <a href="{{ pinned.url }}">{{ pinned.domain }}</a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        function search() {
+            const query = document.getElementById('searchInput').value;
+            window.location.href = `/search?q=${encodeURIComponent(query)}`;
+        }
+
+        function pinLink(id) {
+            fetch(`/pin/${id}`, {method: 'POST'})
+                .then(() => window.location.reload());
+        }
+
+        function deleteLink(id) {
+            if (confirm('Are you sure you want to delete this link?')) {
+                fetch(`/delete/${id}`, {method: 'POST'})
+                    .then(() => window.location.reload());
+            }
+        }
+    </script>
+</body>
+</html> 
