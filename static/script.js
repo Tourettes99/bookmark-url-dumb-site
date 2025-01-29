@@ -318,25 +318,33 @@ window.addEventListener('storage', (e) => {
 // Modify loadURLs function
 function loadURLs() {
     try {
-        const bookmarks = safeJSONParse(localStorage.getItem(STORAGE_KEY), []);
-        updateBookmarksList(bookmarks);
-        updatePinnedLinks(bookmarks);
-        displayURLs(bookmarks); // Always display URLs regardless of search
+        const urls = localStorage.getItem(STORAGE_KEY);
+        // Convert to array or use empty array if null/invalid
+        const parsedUrls = safeJSONParse(urls, []);
+        displayURLs(parsedUrls);
     } catch (error) {
         console.error('Load URLs error:', error);
-        updateBookmarksList([]);
-        updatePinnedLinks([]);
-        displayURLs([]); // Display empty state
+        displayURLs([]); // Pass empty array on error
     }
 }
 
 function displayURLs(urls) {
-    const container = document.getElementById('urls-container');
-    container.innerHTML = '';
+    const urlList = document.getElementById('url-list');
+    if (!urlList) return;
 
-    urls.forEach(url => {
+    // Ensure urls is an array
+    const urlsArray = Array.isArray(urls) ? urls : [];
+    
+    urlList.innerHTML = '';
+    
+    if (urlsArray.length === 0) {
+        urlList.innerHTML = '<p>No URLs found</p>';
+        return;
+    }
+
+    urlsArray.forEach(url => {
         const card = createURLElement(url);
-        container.appendChild(card);
+        urlList.appendChild(card);
     });
 }
 
