@@ -297,18 +297,55 @@ window.addEventListener('storage', (e) => {
     }
 });
 
-// Modify loadURLs function
+// Modify loadURLs function for immediate loading
 function loadURLs() {
     try {
+        // First try to get data from current storage
         const urls = localStorage.getItem(STORAGE_KEY);
-        // Convert to array or use empty array if null/invalid
-        const parsedUrls = safeJSONParse(urls, []);
-        displayURLs(parsedUrls);
+        
+        // Get the current token
+        const currentToken = localStorage.getItem(TOKEN_KEY);
+        
+        if (currentToken) {
+            // Also check token-specific storage
+            const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`);
+            
+            // Use token data if available, otherwise fall back to regular storage
+            const dataToUse = tokenData || urls;
+            
+            // Convert to array or use empty array if null/invalid
+            const parsedUrls = safeJSONParse(dataToUse, []);
+            
+            // Update both displays
+            displayURLs(parsedUrls);
+            updatePinnedLinks(parsedUrls);
+            
+            // Store the data in regular storage for consistency
+            if (tokenData) {
+                localStorage.setItem(STORAGE_KEY, tokenData);
+            }
+        } else {
+            // No token, just use regular storage
+            const parsedUrls = safeJSONParse(urls, []);
+            displayURLs(parsedUrls);
+            updatePinnedLinks(parsedUrls);
+        }
     } catch (error) {
         console.error('Load URLs error:', error);
         displayURLs([]); // Pass empty array on error
     }
 }
+
+// Add this to ensure immediate loading when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadURLs(); // Load immediately
+    
+    // Check for token and initialize sync if needed
+    const existingToken = localStorage.getItem(TOKEN_KEY);
+    if (existingToken) {
+        setupSyncForToken(existingToken);
+    }
+});
 
 function displayURLs(urls) {
     const urlsContainer = document.getElementById('urls-container');
