@@ -294,52 +294,27 @@ window.addEventListener('storage', (e) => {
 // Modify loadURLs function for immediate loading
 function loadURLs() {
     try {
-        // First try to get data from current storage
+        // Get data from storage
         const urls = localStorage.getItem(STORAGE_KEY);
+        const parsedUrls = urls ? JSON.parse(urls) : [];
         
-        // Get the current token
-        const currentToken = localStorage.getItem(TOKEN_KEY);
-        
-        if (currentToken) {
-            // Also check token-specific storage
-            const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`);
-            
-            // Use token data if available, otherwise fall back to regular storage
-            const dataToUse = tokenData || urls;
-            
-            // Convert to array or use empty array if null/invalid
-            const parsedUrls = safeJSONParse(dataToUse, []);
-            
-            // Update both displays
-            displayURLs(parsedUrls);
-            updatePinnedLinks(parsedUrls);
-            
-            // Store the data in regular storage for consistency
-            if (tokenData) {
-                localStorage.setItem(STORAGE_KEY, tokenData);
-            }
-        } else {
-            // No token, just use regular storage
-            const parsedUrls = safeJSONParse(urls, []);
-            displayURLs(parsedUrls);
-            updatePinnedLinks(parsedUrls);
+        // Ensure we have an array
+        if (!Array.isArray(parsedUrls)) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+            displayURLs([]);
+            updatePinnedLinks([]);
+            return;
         }
+        
+        // Update both displays
+        displayURLs(parsedUrls);
+        updatePinnedLinks(parsedUrls);
+        
     } catch (error) {
         console.error('Load URLs error:', error);
         displayURLs([]); // Pass empty array on error
     }
 }
-
-// Add this to ensure immediate loading when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    loadURLs(); // Load immediately
-    
-    // Check for token and initialize sync if needed
-    const existingToken = localStorage.getItem(TOKEN_KEY);
-    if (existingToken) {
-        setupSyncForToken(existingToken);
-    }
-});
 
 function displayURLs(urls) {
     const urlsContainer = document.getElementById('urls-container');
@@ -348,17 +323,20 @@ function displayURLs(urls) {
     // Clear existing content
     urlsContainer.innerHTML = '';
     
-    // Ensure urls is an array
-    const urlsArray = Array.isArray(urls) ? urls : [];
+    // Ensure urls is an array and filter out any invalid entries
+    const urlsArray = Array.isArray(urls) ? urls.filter(url => url && url.url) : [];
     
     if (urlsArray.length === 0) {
         urlsContainer.innerHTML = '<div class="empty-state">No URLs found</div>';
         return;
     }
 
+    // Sort URLs by date added (newest first)
+    urlsArray.sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
+
     urlsArray.forEach(url => {
         const card = createURLElement(url);
-        urlsContainer.appendChild(card);
+        if (card) urlsContainer.appendChild(card);
     });
 }
 
