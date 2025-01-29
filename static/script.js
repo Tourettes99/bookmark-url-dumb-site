@@ -7,7 +7,20 @@ if (!localStorage.getItem(STORAGE_KEY)) {
 }
 
 // Using WebSocket for real-time communication
-const socket = new WebSocket('ws://your-server.com');
+const socket = new WebSocket('ws://localhost:3000');
+
+// Add connection status handling
+socket.onopen = () => {
+    console.log('Connected to WebSocket server');
+};
+
+socket.onerror = (error) => {
+    console.error('WebSocket error:', error);
+};
+
+socket.onclose = () => {
+    console.log('Disconnected from WebSocket server');
+};
 
 function addURL() {
     const url = document.getElementById('url-input').value;
@@ -31,9 +44,10 @@ function addURL() {
     clearInputs();
     showNotification(newBookmark);
 
-    // Send to server
+    // Update the message sent to server to include user identification
     socket.send(JSON.stringify({
         type: 'new_bookmark',
+        userId: getCurrentUserId(),  // Add user identification
         data: newBookmark
     }));
 }
@@ -199,10 +213,20 @@ function showNotification(urlData) {
     }, 5000);
 }
 
-// Listen for other users' bookmarks
+// Update the onmessage handler to only show notifications for OTHER users
 socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    if (data.type === 'new_bookmark') {
+    if (data.type === 'new_bookmark' && data.userId !== getCurrentUserId()) {  // Only show if it's not our own bookmark
         showNotification(data.data);
     }
-}; 
+};
+
+// Helper function to get/generate user ID
+function getCurrentUserId() {
+    let userId = localStorage.getItem('user_id');
+    if (!userId) {
+        userId = 'user_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('user_id', userId);
+    }
+    return userId;
+} 
