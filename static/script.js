@@ -641,10 +641,11 @@ function hideGuide() {
 }
 
 // Add this cookie management system
-function setCookie(name, value, days = 30) {
-    const d = new Date();
-    d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-    const expires = "expires=" + d.toUTCString();
+function setCookie(name, value) {
+    // Set a very far future date (effectively never expires)
+    const farFuture = new Date();
+    farFuture.setFullYear(farFuture.getFullYear() + 100); // 100 years from now
+    const expires = "expires=" + farFuture.toUTCString();
     document.cookie = name + "=" + value + ";" + expires + ";path=/";
 }
 
