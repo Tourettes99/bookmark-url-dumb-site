@@ -5,11 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Teach Mode Dumber</title>
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .site-title {
+            margin-bottom: 1rem;  /* Reduce bottom margin of title */
+        }
+
+        .pinned-links-section {
+            margin-top: 0.5rem;  /* Reduce top margin */
+            padding: 0.5rem;     /* Reduce padding */
+        }
+
+        .pinned-link-item {
+            padding: 0.25rem;    /* Compact the link items */
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <!-- Main Title -->
-        <h1 class="title">Teach Mode<br>Dumber</h1>
+        <h1 class="title site-title">Teach Mode<br>Dumber</h1>
 
         <!-- URL Input Form -->
         <form action="/add" method="POST">
@@ -47,10 +61,10 @@
     </div>
 
     <!-- Pinned Links Section -->
-    <div class="pinned-links">
+    <div class="pinned-links pinned-links-section">
         <h3 class="pinned-links-title">Pinned Links</h3>
         {% for pinned in pinned_links %}
-        <div class="link-card">
+        <div class="link-card pinned-link-item">
             <img src="{{ pinned.favicon }}" alt="favicon" width="20" height="20">
             <a href="{{ pinned.url }}">{{ pinned.domain }}</a>
         </div>
