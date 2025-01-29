@@ -79,13 +79,31 @@ async function initializePusher() {
 }
 
 function setupSyncForToken(token) {
-    const channel = pusher.subscribe(`sync-channel-${token}`);
+    // Unsubscribe from any existing channel
+    if (window.currentChannel) {
+        pusher.unsubscribe(window.currentChannel);
+    }
+    
+    const channelName = `sync-channel-${token}`;
+    window.currentChannel = channelName;
+    
+    const channel = pusher.subscribe(channelName);
+    
     channel.bind('sync-update', function(data) {
         if (data.source !== getDeviceId()) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
-            loadURLs();
-            updatePinnedLinks(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []);
-            showNotification('Synced with other devices', 'success');
+            try {
+                // Update both token-specific and current storage
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
+                localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(data.bookmarks));
+                
+                // Update UI
+                loadURLs();
+                updatePinnedLinks(data.bookmarks);
+                showNotification('Received update from another device', 'success');
+            } catch (error) {
+                console.error('Error handling sync update:', error);
+                showNotification('Failed to process sync update', 'error');
+            }
         }
     });
 }
@@ -193,19 +211,29 @@ function syncChanges(bookmarks) {
     const userToken = localStorage.getItem(TOKEN_KEY);
     if (!userToken) return;
 
-    // Update both storages
-    localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${userToken}`, JSON.stringify(bookmarks));
-    setCookie(`${TOKEN_STORAGE_PREFIX}${userToken}`, JSON.stringify(bookmarks));
+    try {
+        // Update both storages
+        const bookmarksString = JSON.stringify(bookmarks);
+        localStorage.setItem(STORAGE_KEY, bookmarksString);
+        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${userToken}`, bookmarksString);
 
-    fetch('/.netlify/functions/sync-bookmarks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            source: getDeviceId(),
-            token: userToken,
-            bookmarks: bookmarks
-        })
-    });
+        // Send update to other devices
+        fetch('/.netlify/functions/sync-bookmarks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                source: getDeviceId(),
+                token: userToken,
+                bookmarks: bookmarks
+            })
+        }).catch(error => {
+            console.error('Failed to broadcast changes:', error);
+            showNotification('Failed to sync with other devices', 'error');
+        });
+    } catch (error) {
+        console.error('Error in syncChanges:', error);
+        showNotification('Failed to save changes', 'error');
+    }
 }
 
 // Modified togglePin function to include sync
@@ -562,11 +590,6 @@ function mergeBookmarks(bookmarks1, bookmarks2) {
 
 // Update syncWithToken function
 function syncWithToken() {
-    if (!isPusherInitialized()) {
-        showNotification('Sync service not initialized. Please refresh the page.', 'error');
-        return;
-    }
-
     const inputToken = document.getElementById('token-input').value;
     if (!inputToken) {
         showNotification('Please enter a sync token', 'error');
@@ -574,20 +597,31 @@ function syncWithToken() {
     }
 
     try {
-        const channel = pusher.subscribe(`sync-channel-${inputToken}`);
+        // Save token for future use
         localStorage.setItem(TOKEN_KEY, inputToken);
         
-        // Initialize empty storage for new tokens
-        if (!localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`)) {
+        // Set up Pusher channel subscription
+        setupSyncForToken(inputToken);
+        
+        // Get existing data for this token
+        const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`);
+        if (tokenData) {
+            // Update local storage with token data
+            localStorage.setItem(STORAGE_KEY, tokenData);
+            
+            // Update UI
+            const bookmarks = JSON.parse(tokenData);
+            loadURLs();
+            updatePinnedLinks(bookmarks);
+            
+            showNotification('Successfully synced with existing data', 'success');
+        } else {
+            // If no existing data, initialize empty storage
             localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify([]));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+            loadURLs();
+            showNotification('New sync token initialized', 'success');
         }
-        
-        const mergedBookmarks = syncTokenStorage(inputToken);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedBookmarks));
-        loadURLs();
-        updatePinnedLinks(mergedBookmarks);
-        
-        // Rest of the existing syncWithToken code...
     } catch (error) {
         console.error('Token sync error:', error);
         showNotification('Failed to sync. Please try again.', 'error');
