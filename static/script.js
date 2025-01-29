@@ -29,6 +29,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     loadURLs();
     document.getElementById('search-input')?.addEventListener('input', searchLinks);
+
+    const cookieConsent = localStorage.getItem('cookieConsent');
+    if (!cookieConsent) {
+        showCookieConsent();
+    }
 });
 
 // Add this near the top of the file, after the constants
@@ -718,4 +723,30 @@ localStorage.getItem = function(key) {
         return localValue || cookieValue;
     }
     return localValue;
-}; 
+};
+
+// Add cookie consent functions
+function showCookieConsent() {
+    const consentContainer = document.createElement('div');
+    consentContainer.className = 'cookie-consent';
+    consentContainer.innerHTML = `
+        <div class="cookie-content">
+            <p>🍪 This site uses cookies to improve your experience and sync preferences.</p>
+            <div class="cookie-buttons">
+                <button onclick="acceptCookies()" class="accept-button">Accept Cookies</button>
+                <button onclick="declineCookies()" class="decline-button">Decline</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(consentContainer);
+}
+
+function acceptCookies() {
+    localStorage.setItem('cookieConsent', 'accepted');
+    document.querySelector('.cookie-consent')?.remove();
+}
+
+function declineCookies() {
+    localStorage.setItem('cookieConsent', 'declined');
+    document.querySelector('.cookie-consent')?.remove();
+} 
