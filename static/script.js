@@ -22,32 +22,41 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initializePusher() {
     try {
         const response = await fetch('/.netlify/functions/get-pusher-config');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        
+        // Debug response
+        const textResponse = await response.text();
+        try {
+            const config = JSON.parse(textResponse);
+            
+            if (!config.key || !config.cluster) {
+                throw new Error('Invalid Pusher configuration');
+            }
+            
+            // Initialize Pusher with fetched credentials
+            window.pusher = new Pusher(config.key, {
+                cluster: config.cluster,
+                encrypted: true
+            });
+            
+            const existingToken = localStorage.getItem(TOKEN_KEY);
+            if (existingToken) {
+                setupSyncForToken(existingToken);
+            }
+            
+            showNotification('Sync service initialized', 'success');
+        } catch (parseError) {
+            console.error('Response was:', textResponse);
+            throw new Error(`Failed to parse response: ${parseError.message}`);
         }
-        const config = await response.json();
-        
-        // Check if we got valid config
-        if (!config.key || !config.cluster) {
-            throw new Error('Invalid Pusher configuration received');
-        }
-        
-        // Initialize Pusher with fetched credentials
-        window.pusher = new Pusher(config.key, {
-            cluster: config.cluster,
-            encrypted: true
-        });
-        
-        // Check if there's an existing token and set up sync
-        const existingToken = localStorage.getItem(TOKEN_KEY);
-        if (existingToken) {
-            setupSyncForToken(existingToken);
-        }
-        
-        showNotification('Sync service initialized', 'success');
     } catch (error) {
-        console.error('Failed to initialize Pusher:', error);
-        showNotification('Failed to initialize sync service. Please check your configuration.', 'error');
+        console.error('Pusher initialization failed:', error);
+        showNotification('Failed to initialize sync service. Check console for details.', 'error');
+        // Make pusher available even if initialization fails
+        window.pusher = {
+            subscribe: () => ({
+                bind: () => {} // No-op function
+            })
+        };
     }
 }
 
@@ -458,8 +467,18 @@ function generateToken() {
     showNotification('New sync token generated', 'success');
 }
 
-// Sync data using a token
+// Add this helper function to check if Pusher is properly initialized
+function isPusherInitialized() {
+    return window.pusher && typeof window.pusher.subscribe === 'function';
+}
+
+// Update the sync function to check Pusher status
 function syncWithToken() {
+    if (!isPusherInitialized()) {
+        showNotification('Sync service not initialized. Please refresh the page.', 'error');
+        return;
+    }
+
     const inputToken = document.getElementById('token-input').value;
     if (!inputToken) {
         showNotification('Please enter a sync token', 'error');
@@ -501,6 +520,6 @@ function syncWithToken() {
         
     } catch (error) {
         console.error('Sync error:', error);
-        showNotification('Failed to enable sync', 'error');
+        showNotification('Failed to sync. Please try again.', 'error');
     }
 } 
