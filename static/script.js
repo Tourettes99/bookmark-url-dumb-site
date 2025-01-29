@@ -23,41 +23,34 @@ socket.onclose = () => {
 };
 
 // Add this near the top of the file
-const pusher = new Pusher('YOUR_PUSHER_KEY', {
-  cluster: 'YOUR_CLUSTER'
+const pusher = new Pusher('0BFB1E76B48B2D3174BC425E898D70122225C56B80137D0736D3E9461665F3BB', {
+    cluster: 'fc9cdf01-b041-4632-b7ce-e1169912c516',
+    encrypted: true
 });
 
 const channel = pusher.subscribe('bookmarks-channel');
-channel.bind('new-bookmark', function(data) {
-    // Only show notification if it's not from the current tab
-    if (data.timestamp !== lastBookmarkTimestamp) {
-        showNotification(data, true);
-    }
-});
 
-// Modify the addURL function
+// Update addURL function
 function addURL(event) {
     event.preventDefault();
-    const urlInput = document.getElementById('url');
-    const categoryInput = document.getElementById('category');
-    const hashtagsInput = document.getElementById('hashtags');
+    const urlInput = document.getElementById('url-input');
+    const categoryInput = document.getElementById('category-input');
+    const hashtagsInput = document.getElementById('hashtags-input');
     
     const urlData = {
         url: urlInput.value,
         category: categoryInput.value,
         hashtags: hashtagsInput.value,
-        timestamp: new Date().getTime()
+        timestamp: new Date().getTime(),
+        userId: getCurrentUserId()
     };
 
-    // Store the timestamp to prevent duplicate notifications
-    lastBookmarkTimestamp = urlData.timestamp;
-
-    // Save to localStorage as before
+    // Save to localStorage
     const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
     urls.push(urlData);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
 
-    // Trigger Pusher event
+    // Trigger Pusher event through Netlify function
     fetch('/.netlify/functions/trigger-notification', {
         method: 'POST',
         body: JSON.stringify(urlData),
