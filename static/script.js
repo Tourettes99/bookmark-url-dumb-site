@@ -804,13 +804,3 @@ function getCookie(name) {
     }
     return null;
 }
-
-.empty-state {
-    text-align: center;
-    padding: 20px;
-    color: var(--text-gray);
-    border: 1px solid var(--orange);
-    border-radius: 8px;
-    margin: 20px;
-    background-color: rgba(255, 87, 34, 0.05);
-}
