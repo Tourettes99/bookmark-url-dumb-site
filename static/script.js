@@ -598,36 +598,55 @@ function copyToken() {
     showNotification('Token copied to clipboard!', 'success');
 }
 
-// Modify the existing generateToken function
-function generateToken() {
-    // Save previous token and its data if exists
-    const previousToken = localStorage.getItem(TOKEN_KEY);
-    if (previousToken) {
-        const previousData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${previousToken}`);
-        if (previousData) {
-            localStorage.setItem(`token_history_${previousToken}`, previousData);
+// Add this function to handle token switching
+async function switchToToken(token) {
+    try {
+        // Save current token's data if exists
+        const currentToken = localStorage.getItem(TOKEN_KEY);
+        if (currentToken) {
+            const currentData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(currentData));
         }
-    }
 
+        // Load new token's data
+        const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
+        if (tokenData) {
+            localStorage.setItem(STORAGE_KEY, tokenData);
+        } else {
+            // Initialize new token storage if no data exists
+            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify([]));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+        }
+
+        // Update current token
+        localStorage.setItem(TOKEN_KEY, token);
+        
+        // Setup sync and update UI
+        await setupSyncForToken(token);
+        loadURLs();
+        
+        showNotification('Switched to token: ' + token, 'success');
+    } catch (error) {
+        console.error('Token switch error:', error);
+        showNotification('Failed to switch token', 'error');
+    }
+}
+
+// Modify generateToken function
+function generateToken() {
     const newToken = 'token_' + Date.now();
     const tokenInput = document.getElementById('token-input');
     if (tokenInput) {
         tokenInput.value = newToken;
     }
     
-    // Initialize new token with empty data
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${newToken}`, JSON.stringify([]));
-    setCookie(TOKEN_KEY, newToken);
-    setCookie(`${TOKEN_STORAGE_PREFIX}${newToken}`, JSON.stringify([]));
-    
-    // Clear current display
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-    loadURLs();
-    updatePinnedLinks([]);
-    
-    setupSyncForToken(newToken);
+    switchToToken(newToken);
     showNotification('New sync token generated!', 'success');
+}
+
+// Modify saveAndSetupToken function
+async function saveAndSetupToken(token) {
+    await switchToToken(token);
 }
 
 // Add this helper function to check if Pusher is properly initialized
@@ -798,85 +817,6 @@ async function fetchAndMergeData(token) {
     }
     
     return mergedData;
-}
-
-// Add this function to persist token across sessions
-function saveAndSetupToken(token) {
-    localStorage.setItem(TOKEN_KEY, token);
-    // Store timestamp with token
-    localStorage.setItem(`${TOKEN_KEY}_timestamp`, Date.now());
-    setupSyncForToken(token);
-    
-    // Immediately fetch existing bookmarks for this token
-    fetchExistingBookmarks(token);
-}
-
-// Add this function to manage separate token spaces
-function createTokenSpace(token) {
-    const tokenSpace = {
-        bookmarks: [],
-        pinned: [],
-        dateCreated: new Date().toISOString()
-    };
-    
-    // Set up separate storage for this token
-    localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(tokenSpace));
-    if (getCookie('cookie_consent') === 'accepted') {
-        setCookie(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(tokenSpace));
-    }
-    return tokenSpace;
-}
-
-// Add this function to fetch existing bookmarks for a token
-function fetchExistingBookmarks(token) {
-    // Implementation of fetchExistingBookmarks function
-}
-
-// Add this function to get cookie
-function getCookie(name) {
-    // Implementation of getCookie function
-}
-
-// Add this function to set cookie
-function setCookie(name, value) {
-    // Implementation of setCookie function
-}
-
-// Add manual refresh function
-function refreshCurrentToken() {
-    const currentToken = localStorage.getItem(TOKEN_KEY);
-    if (!currentToken) {
-        showNotification('No token found. Please set a sync token first.', 'error');
-        return;
-    }
-
-    try {
-        // Get data from all possible sources
-        const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`) || 
-                         getCookie(`${TOKEN_STORAGE_PREFIX}${currentToken}`);
-        
-        if (tokenData) {
-            const parsedData = JSON.parse(decodeURIComponent(tokenData));
-            const bookmarks = Array.isArray(parsedData) ? parsedData : [];
-            
-            // Update all storages
-            unifiedStorageHandler(currentToken, bookmarks);
-            
-            // Update UI
-            loadURLs();
-            updatePinnedLinks(bookmarks);
-            
-            // Trigger sync to other devices
-            syncChanges(bookmarks);
-            
-            showNotification('Data refreshed and synced successfully!', 'success');
-        } else {
-            showNotification('No data found for current token', 'warning');
-        }
-    } catch (error) {
-        console.error('Refresh error:', error);
-        showNotification('Failed to refresh data', 'error');
-    }
 }
 
 // Add this function to hide the guide
