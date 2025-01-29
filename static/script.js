@@ -34,6 +34,16 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!cookieConsent) {
         showCookieConsent();
     }
+
+    // Add refresh button next to token input
+    const tokenContainer = document.querySelector('.token-container');
+    if (tokenContainer) {
+        const refreshButton = document.createElement('button');
+        refreshButton.className = 'button refresh-token-btn';
+        refreshButton.innerHTML = '🔄 Refresh';
+        refreshButton.onclick = refreshCurrentToken;
+        tokenContainer.appendChild(refreshButton);
+    }
 });
 
 // Add this near the top of the file, after the constants
@@ -680,4 +690,23 @@ function getCookie(name) {
 // Add this function to set cookie
 function setCookie(name, value) {
     // Implementation of setCookie function
+}
+
+// Add manual refresh function
+function refreshCurrentToken() {
+    const currentToken = localStorage.getItem(TOKEN_KEY);
+    if (!currentToken) {
+        showNotification('No token found. Please set a sync token first.', 'error');
+        return;
+    }
+
+    // Get data from token storage
+    const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`);
+    if (tokenData) {
+        localStorage.setItem(STORAGE_KEY, tokenData);
+        loadURLs();
+        showNotification('Data refreshed successfully!', 'success');
+    } else {
+        showNotification('No data found for current token', 'warning');
+    }
 }
