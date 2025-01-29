@@ -259,26 +259,30 @@ function addURL() {
 }
 
 // Sync changes to other devices
-function syncChanges(bookmarks) {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return;
-    
+async function syncChanges(token, bookmarks) {
     try {
-        // Store in token-specific storage
-        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(bookmarks));
-        
-        // Send to other devices
-        fetch('/.netlify/functions/sync-bookmarks', {
+        const response = await fetch('/.netlify/functions/sync-bookmarks', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify({
-                source: getDeviceId(),
                 token: token,
-                bookmarks: bookmarks
+                bookmarks: bookmarks,
+                source: 'browser'
             })
-        }).catch(error => console.error('Sync error:', error));
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data;
     } catch (error) {
-        console.error('Sync changes error:', error);
+        console.error('Sync error:', error);
+        showNotification('Failed to sync - please check your connection', 'error');
+        throw error; // Re-throw to maintain existing error handling
     }
 }
 
