@@ -347,16 +347,10 @@ button:hover {
     }
 
     #pinned-links {
+        padding: 8px;
+        min-height: 60px;
         display: flex;
-        overflow-x: auto;
-        gap: 10px;
-        padding-bottom: 5px;
-        scrollbar-width: none;  /* Firefox */
-        -ms-overflow-style: none;  /* IE and Edge */
-    }
-
-    #pinned-links::-webkit-scrollbar {
-        display: none;  /* Chrome, Safari, Opera */
+        align-items: center;
     }
 
     .pinned-link {
@@ -365,6 +359,25 @@ button:hover {
         padding: 8px 12px;
         border-radius: 8px;
         border: 1px solid var(--orange);
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+    }
+
+    /* Style for "No pinned links yet" message */
+    .no-pins {
+        text-align: center;
+        padding: 12px;
+        color: var(--text-gray);
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 40px;
+        border: 1px solid var(--orange);
+        border-radius: 8px;
+        margin: 8px 0;
+        background-color: rgba(255, 92, 40, 0.1);
     }
 
     .main-content {
@@ -493,5 +506,4 @@ button:hover {
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.9em;
-} 
 } 
