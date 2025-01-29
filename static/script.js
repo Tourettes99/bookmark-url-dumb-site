@@ -7,6 +7,10 @@ var SYNC_INTERVAL = 30000; // 30 seconds
 // Add this at the beginning of the file, after the constants
 const isPuppeteerTest = navigator.userAgent.includes('HeadlessChrome');
 
+// Add this at the top of script.js after the constants
+let pusherInitialized = false;
+let initializationPromise = null;
+
 // Initialize storage when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Check if guide should be hidden
@@ -52,94 +56,72 @@ document.addEventListener('DOMContentLoaded', function() {
 // Modify initializePusher function
 async function initializePusher() {
     if (isPuppeteerTest) {
-        // Mock Pusher for tests
         window.pusher = {
             subscribe: () => ({
                 bind: () => {}
             })
         };
+        pusherInitialized = true;
         return;
     }
-    
-    try {
-        const response = await fetch('/.netlify/functions/get-pusher-config');
-        
-        // Debug response
-        const textResponse = await response.text();
+
+    // If already initializing, wait for that promise
+    if (initializationPromise) {
+        return initializationPromise;
+    }
+
+    initializationPromise = new Promise(async (resolve, reject) => {
         try {
-            const config = JSON.parse(textResponse);
+            const response = await fetch('/.netlify/functions/get-pusher-config');
+            const config = await response.json();
             
             if (!config.key || !config.cluster) {
                 throw new Error('Invalid Pusher configuration');
             }
             
-            // Initialize Pusher with fetched credentials
             window.pusher = new Pusher(config.key, {
                 cluster: config.cluster,
                 encrypted: true
             });
             
-            const existingToken = localStorage.getItem(TOKEN_KEY);
-            if (existingToken) {
-                setupSyncForToken(existingToken);
-            }
-            
+            pusherInitialized = true;
             showNotification('Sync service initialized', 'success');
-        } catch (parseError) {
-            console.error('Response was:', textResponse);
-            throw new Error(`Failed to parse response: ${parseError.message}`);
-        }
-    } catch (error) {
-        console.error('Pusher initialization failed:', error);
-        showNotification('Failed to initialize sync service', 'error');
-    }
-}
-
-function setupSyncForToken(token) {
-    // Check if pusher is initialized
-    if (!window.pusher) {
-        console.warn('Pusher not initialized, initializing now...');
-        initializePusher().then(() => {
-            setupSyncChannel(token);
-        });
-    } else {
-        setupSyncChannel(token);
-    }
-}
-
-// New helper function to handle channel setup
-function setupSyncChannel(token) {
-    // Unsubscribe from any existing channel
-    if (window.currentChannel) {
-        window.pusher.unsubscribe(window.currentChannel);
-    }
-    
-    const channelName = `sync-channel-${token}`;
-    window.currentChannel = channelName;
-    
-    const channel = window.pusher.subscribe(channelName);
-    
-    channel.bind('sync-update', function(data) {
-        if (data.source !== getDeviceId()) {
-            try {
-                // Update both token-specific and current storage
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
-                localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(data.bookmarks));
-                
-                // Update UI
-                loadURLs();
-                updatePinnedLinks(data.bookmarks);
-                showNotification('Received update from another device', 'success');
-            } catch (error) {
-                console.error('Error handling sync update:', error);
-                showNotification('Failed to process sync update', 'error');
-            }
+            resolve();
+        } catch (error) {
+            console.error('Pusher initialization failed:', error);
+            showNotification('Failed to initialize sync service', 'error');
+            reject(error);
         }
     });
+
+    return initializationPromise;
 }
 
-// Call this when the page loads
-document.addEventListener('DOMContentLoaded', initializePusher);
+async function setupSyncForToken(token) {
+    try {
+        if (!pusherInitialized) {
+            await initializePusher();
+        }
+        
+        if (window.currentChannel) {
+            window.pusher.unsubscribe(window.currentChannel);
+        }
+        
+        const channelName = `sync-channel-${token}`;
+        window.currentChannel = channelName;
+        
+        const channel = window.pusher.subscribe(channelName);
+        
+        channel.bind('sync-update', function(data) {
+            if (data.source !== getDeviceId()) {
+                handleSyncUpdate(data);
+            }
+        });
+    } catch (error) {
+        console.error('Setup sync error:', error);
+        showNotification('Failed to setup sync', 'error');
+    }
+}
 
 // Generate unique device ID
 function getDeviceId() {
