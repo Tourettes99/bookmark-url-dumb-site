@@ -801,3 +801,26 @@ button:hover {
     margin: 20px;
     background-color: rgba(255, 87, 34, 0.05);
 }
+
+.performance-report {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.9);
+    border: 1px solid var(--orange);
+    border-radius: 8px;
+    padding: 15px;
+    color: var(--text-gray);
+    font-size: 0.9em;
+    z-index: 1000;
+    animation: slideIn 0.3s ease;
+}
+
+.performance-report h3 {
+    color: var(--orange);
+    margin: 0 0 10px 0;
+}
+
+.performance-report p {
+    margin: 5px 0;
+}
