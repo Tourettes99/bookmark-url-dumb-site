@@ -163,5 +163,6 @@ function importFromExcel(event) {
 // Load URLs when page loads
 document.addEventListener('DOMContentLoaded', () => {
     const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    displayURLs(urls);
     updatePinnedLinks(urls);
 }); 
