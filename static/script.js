@@ -21,6 +21,16 @@ const PERFORMANCE_METRICS = {
     errors: []
 };
 
+// Add this after the constants section
+const SYNC_STATES = {
+    IDLE: 'idle',
+    STARTING: 'starting',
+    IN_PROGRESS: 'in_progress',
+    COMPLETED: 'completed',
+    ERROR: 'error',
+    RETRYING: 'retrying'
+};
+
 // Initialize storage when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Check if guide should be hidden
@@ -269,11 +279,14 @@ function addURL() {
 
 // Sync changes to other devices
 async function syncChanges(token, bookmarks) {
+    updateSyncProgress(0, 'Starting sync...', SYNC_STATES.STARTING);
+    
     try {
-        // Add timeout to prevent hanging requests
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
+        updateSyncProgress(20, 'Preparing data...');
+        
         const response = await fetch('/.netlify/functions/sync-bookmarks', {
             method: 'POST',
             headers: {
@@ -289,6 +302,7 @@ async function syncChanges(token, bookmarks) {
             signal: controller.signal
         });
 
+        updateSyncProgress(50, 'Sending data...');
         clearTimeout(timeoutId);
 
         if (!response.ok) {
@@ -296,34 +310,28 @@ async function syncChanges(token, bookmarks) {
         }
 
         const data = await response.json();
+        updateSyncProgress(80, 'Verifying sync...');
         
-        // Verify the response data
         if (!data || data.error) {
             throw new Error(data?.error || 'Invalid response from server');
         }
 
-        // Update local storage after successful sync
         localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(bookmarks));
+        updateSyncProgress(100, 'Sync successful!', SYNC_STATES.COMPLETED);
         
         return data;
     } catch (error) {
-        // More specific error handling
         if (error.name === 'AbortError') {
-            showNotification('Sync timeout - please try again', 'error');
+            updateSyncProgress(100, 'Sync timeout', SYNC_STATES.ERROR);
         } else if (!navigator.onLine) {
-            showNotification('No internet connection - will retry when online', 'warning');
-            // Add to retry queue when back online
-            window.addEventListener('online', () => syncChanges(token, bookmarks), { once: true });
+            updateSyncProgress(100, 'No internet connection', SYNC_STATES.ERROR);
+            window.addEventListener('online', () => {
+                updateSyncProgress(0, 'Retrying sync...', SYNC_STATES.RETRYING);
+                syncChanges(token, bookmarks);
+            }, { once: true });
         } else {
-            showNotification('Sync failed - please check your connection', 'error');
+            updateSyncProgress(100, 'Sync failed', SYNC_STATES.ERROR);
         }
-        
-        console.error('Detailed sync error:', {
-            error: error.message,
-            stack: error.stack,
-            token: token ? 'exists' : 'missing',
-            bookmarksCount: bookmarks?.length || 0
-        });
         
         throw error;
     }
@@ -1182,5 +1190,32 @@ async function addURLAndSync() {
     } catch (error) {
         console.error('Add and sync error:', error);
         showNotification('Error: Failed to add or sync URL', 'error');
+    }
+}
+
+function updateSyncProgress(progress, status, state = SYNC_STATES.IN_PROGRESS) {
+    const progressBar = document.getElementById('sync-progress-bar');
+    const statusElement = document.getElementById('sync-status');
+    
+    if (progressBar && statusElement) {
+        progressBar.style.width = `${progress}%`;
+        progressBar.className = 'sync-progress-bar' + (state === SYNC_STATES.ERROR ? ' error' : '');
+        
+        let statusText = status;
+        if (state === SYNC_STATES.RETRYING) {
+            statusText += ' (Retrying...)';
+        }
+        
+        statusElement.textContent = statusText;
+        
+        // Reset progress bar after completion or error
+        if (state === SYNC_STATES.COMPLETED || state === SYNC_STATES.ERROR) {
+            setTimeout(() => {
+                progressBar.style.width = '0%';
+                if (state === SYNC_STATES.COMPLETED) {
+                    statusElement.textContent = 'Sync completed';
+                }
+            }, 3000);
+        }
     }
 }

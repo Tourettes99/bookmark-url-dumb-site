@@ -824,3 +824,38 @@ button:hover {
 .performance-report p {
     margin: 5px 0;
 }
+
+.sync-progress-container {
+    margin-top: 10px;
+    width: 100%;
+    background: #1a1a1a;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.sync-progress-bar {
+    width: 0%;
+    height: 4px;
+    background: var(--orange);
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.sync-progress-bar.error {
+    background: #ff4444;
+}
+
+.sync-status {
+    font-size: 0.8em;
+    color: var(--text-gray);
+    text-align: center;
+    margin-top: 4px;
+    min-height: 20px;
+}
+
+@media (max-width: 768px) {
+    .sync-progress-container {
+        margin: 8px 0;
+    }
+}
