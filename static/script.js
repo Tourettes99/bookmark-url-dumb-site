@@ -15,27 +15,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('search-input')?.addEventListener('input', searchLinks);
 });
 
-// Using WebSocket for real-time communication
-const socket = new WebSocket('ws://localhost:3000');
-
-// Add connection status handling
-socket.onopen = () => {
-    console.log('Connected to WebSocket server');
-};
-
-socket.onerror = (error) => {
-    console.error('WebSocket error:', error);
-};
-
-socket.onclose = () => {
-    console.log('Disconnected from WebSocket server');
-};
-
-// Enable pusher logging - don't include this in production
-Pusher.logToConsole = true;
-
-const pusher = new Pusher(process.env.PUSHER_KEY, {
-    cluster: process.env.PUSHER_CLUSTER,
+// Initialize Pusher
+const pusher = new Pusher('your-pusher-key', {
+    cluster: 'your-cluster',
     encrypted: true
 });
 
@@ -45,7 +27,8 @@ const channel = pusher.subscribe('bookmarks-sync');
 channel.bind('sync-update', function(data) {
     if (data.source !== getDeviceId()) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
-        updateUI();
+        loadURLs();
+        updatePinnedLinks(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []);
     }
 });
 
@@ -57,6 +40,37 @@ function getDeviceId() {
         localStorage.setItem('device_id', deviceId);
     }
     return deviceId;
+}
+
+// Modified addURL function to include sync
+function addURL() {
+    const urlInput = document.getElementById('url-input');
+    const categoryInput = document.getElementById('category-input');
+    const hashtagsInput = document.getElementById('hashtags-input');
+    
+    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const newUrl = {
+        url: urlInput.value,
+        category: categoryInput.value,
+        hashtags: hashtagsInput.value.split(',').map(tag => tag.trim()),
+        pinned: false,
+        dateAdded: new Date().toISOString()
+    };
+    
+    urls.push(newUrl);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
+    
+    // Sync changes
+    syncChanges(urls);
+    
+    // Update UI
+    loadURLs();
+    updatePinnedLinks(urls);
+    
+    // Clear inputs
+    urlInput.value = '';
+    categoryInput.value = '';
+    hashtagsInput.value = '';
 }
 
 // Sync changes to other devices
@@ -73,11 +87,22 @@ function syncChanges(bookmarks) {
     });
 }
 
-// Modified save function to include sync
-function saveBookmarks(bookmarks) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
-    syncChanges(bookmarks);
-    updateUI();
+// Modified togglePin function to include sync
+function togglePin(url) {
+    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const urlIndex = urls.findIndex(item => item.url === url);
+    
+    if (urlIndex !== -1) {
+        urls[urlIndex].pinned = !urls[urlIndex].pinned;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
+        
+        // Sync changes
+        syncChanges(urls);
+        
+        // Update UI
+        loadURLs();
+        updatePinnedLinks(urls);
+    }
 }
 
 // Load bookmarks with sync check
@@ -99,48 +124,6 @@ window.addEventListener('storage', (e) => {
         updateUI();
     }
 });
-
-function addURL(event) {
-    if (event) event.preventDefault();
-    
-    const urlInput = document.getElementById('url-input');
-    const categoryInput = document.getElementById('category-input');
-    const hashtagsInput = document.getElementById('hashtags-input');
-    
-    if (!urlInput.value) return;
-
-    try {
-        // Validate URL
-        new URL(urlInput.value);
-
-        const urlData = {
-            url: urlInput.value,
-            category: categoryInput.value,
-            hashtags: hashtagsInput.value ? hashtagsInput.value.split(',').map(tag => tag.trim()) : [],
-            timestamp: new Date().getTime(),
-            pinned: false
-        };
-
-        // Get existing URLs and add new one
-        const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-        urls.push(urlData);
-        
-        // Save back to localStorage
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
-
-        // Clear inputs
-        urlInput.value = '';
-        categoryInput.value = '';
-        hashtagsInput.value = '';
-
-        // Reload URLs
-        loadURLs();
-
-        showNotification('URL added successfully!');
-    } catch (e) {
-        showNotification('Please enter a valid URL', 'error');
-    }
-}
 
 function loadURLs() {
     const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
@@ -278,17 +261,6 @@ function updatePinnedLinks(urls) {
         link.className = 'pinned-link';
         pinnedContainer.appendChild(link);
     });
-}
-
-function togglePin(url) {
-    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    const urlIndex = urls.findIndex(item => item.url === url);
-    
-    if (urlIndex !== -1) {
-        urls[urlIndex].pinned = !urls[urlIndex].pinned;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
-        loadURLs();
-    }
 }
 
 function searchLinks() {
