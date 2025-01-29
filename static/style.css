@@ -593,3 +593,56 @@ button:hover {
     background-color: #111;
     color: var(--text-gray);
 }
+
+.token-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #111;
+    border: 2px solid var(--orange);
+    border-radius: 8px;
+    padding: 20px;
+    z-index: 1100;
+    text-align: center;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+}
+
+.token-display {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.token-display input {
+    background-color: #000;
+    border: 1px solid var(--orange);
+    color: var(--text-gray);
+    padding: 10px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 1.1em;
+    width: 250px;
+    text-align: center;
+}
+
+.copy-button {
+    background-color: var(--orange);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0 15px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.copy-button:hover {
+    background-color: #ff4411;
+}
+
+.token-info {
+    color: var(--text-gray);
+    font-size: 0.9em;
+    margin-top: 10px;
+    opacity: 0.8;
+}

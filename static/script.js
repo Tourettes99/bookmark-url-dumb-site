@@ -407,20 +407,39 @@ function generateToken() {
     const token = 'TMD_' + Math.random().toString(36).substring(2, 15) + 
                  Math.random().toString(36).substring(2, 15);
     
-    // Save current data with the new token
     const currentData = localStorage.getItem(STORAGE_KEY);
     if (currentData) {
         localStorage.setItem(TOKEN_STORAGE_PREFIX + token, currentData);
     }
     
-    // Show token to user
-    showNotification({
-        url: token,
-        category: 'Copy this token to sync your data across devices'
-    });
+    // Create token display modal
+    const modalHtml = `
+        <div class="token-modal">
+            <h3>Your Sync Token</h3>
+            <div class="token-display">
+                <input type="text" value="${token}" id="tokenDisplay" readonly>
+                <button onclick="copyToken()" class="copy-button">Copy</button>
+            </div>
+            <p class="token-info">Save this token to sync your bookmarks across devices</p>
+        </div>
+    `;
     
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
     localStorage.setItem(TOKEN_KEY, token);
     return token;
+}
+
+function copyToken() {
+    const tokenDisplay = document.getElementById('tokenDisplay');
+    tokenDisplay.select();
+    document.execCommand('copy');
+    
+    const copyButton = document.querySelector('.copy-button');
+    copyButton.textContent = 'Copied!';
+    setTimeout(() => {
+        copyButton.textContent = 'Copy';
+        document.querySelector('.token-modal').remove();
+    }, 2000);
 }
 
 // Sync data using a token
