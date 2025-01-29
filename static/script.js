@@ -27,6 +27,11 @@ async function initializePusher() {
         }
         const config = await response.json();
         
+        // Check if we got valid config
+        if (!config.key || !config.cluster) {
+            throw new Error('Invalid Pusher configuration received');
+        }
+        
         // Initialize Pusher with fetched credentials
         window.pusher = new Pusher(config.key, {
             cluster: config.cluster,
@@ -42,7 +47,7 @@ async function initializePusher() {
         showNotification('Sync service initialized', 'success');
     } catch (error) {
         console.error('Failed to initialize Pusher:', error);
-        showNotification('Failed to initialize sync service. Please refresh the page.', 'error');
+        showNotification('Failed to initialize sync service. Please check your configuration.', 'error');
     }
 }
 
