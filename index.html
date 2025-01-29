@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>Teach Mode Dumber - Make your lessons easier</title>
     <meta name="description" content="Make your lessons easier" />
-    <link rel="stylesheet" href="static/style.css">
+    <link rel="stylesheet" href="/static/style.css" type="text/css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
     
@@ -21,6 +21,25 @@
     <meta name="twitter:title" content="Teach Mode Dumber" />
     <meta name="twitter:description" content="Make your lessons easier" />
     <meta name="twitter:image" content="https://raw.githubusercontent.com/Tourettes99/bookmark-url-dumb-site/main/preview.png" />
+
+    <!-- Fallback for stylesheet loading -->
+    <script>
+        function loadCSS(href) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = href;
+            link.type = 'text/css';
+            document.head.appendChild(link);
+        }
+        
+        // Check if main stylesheet failed to load
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'LINK' && e.target.rel === 'stylesheet') {
+                // Try loading with absolute path
+                loadCSS('/static/style.css');
+            }
+        }, true);
+    </script>
 </head>
 <body>
     <div class="sidebar">
@@ -85,24 +104,24 @@
 
         <!-- Add Token Management Section -->
         <div class="token-section">
-            <button onclick="generateToken()" class="token-button">Generate Sync Token</button>
-            <input type="text" id="token-input" placeholder="Enter sync token">
+            <button onclick="generateToken()" class="token-button" id="generate-token-btn" name="generate-token-btn">Generate Sync Token</button>
+            <input type="text" id="token-input" name="token-input" placeholder="Enter sync token" autocomplete="off">
             <div class="token-actions">
-                <button onclick="syncWithToken()" class="token-button">Save Data</button>
-                <button onclick="refreshCurrentToken()" class="token-button refresh-token-btn">🔄 Refresh</button>
+                <button onclick="syncWithToken()" class="token-button" id="save-token-btn" name="save-token-btn">Save Data</button>
+                <button onclick="refreshCurrentToken()" class="token-button refresh-token-btn" id="refresh-token-btn" name="refresh-token-btn">🔄 Refresh</button>
             </div>
         </div>
 
         <div class="add-url-form">
-            <input type="text" id="url-input" placeholder="Enter URL">
-            <input type="text" id="category-input" placeholder="Category">
-            <input type="text" id="hashtags-input" placeholder="Hashtags (comma-separated)">
-            <button onclick="addURL()">Add URL</button>
+            <input type="text" id="url-input" name="url-input" placeholder="Enter URL" autocomplete="url">
+            <input type="text" id="category-input" name="category-input" placeholder="Category" autocomplete="off">
+            <input type="text" id="hashtags-input" name="hashtags-input" placeholder="Hashtags (comma-separated)" autocomplete="off">
+            <button onclick="addURL()" id="add-url-btn" name="add-url-btn">Add URL</button>
         </div>
 
         <div class="search-section">
-            <input type="text" id="search-input" placeholder="Search by URL or hashtag...">
-            <button onclick="searchLinks()">Search</button>
+            <input type="text" id="search-input" name="search-input" placeholder="Search by URL or hashtag..." autocomplete="off">
+            <button onclick="searchLinks()" id="search-btn" name="search-btn">Search</button>
         </div>
 
         <div id="urls-container">

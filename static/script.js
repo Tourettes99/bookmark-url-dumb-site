@@ -52,8 +52,13 @@ document.addEventListener('DOMContentLoaded', function() {
         tokenContainer.appendChild(refreshButton);
     }
 
-    // Add this new event listener
-    window.addEventListener('storage', handleStorageChange);
+    // Replace window.addEventListener('storage', handleStorageChange) with:
+    window.addEventListener('pagehide', function(event) {
+        const currentToken = localStorage.getItem(TOKEN_KEY);
+        if (currentToken) {
+            syncChanges(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+        }
+    });
 });
 
 // Modify initializePusher function
@@ -307,13 +312,6 @@ function updateUI() {
     updateBookmarksList(bookmarks);
 }
 
-// Add event listener for storage changes
-window.addEventListener('storage', (e) => {
-    if (e.key === STORAGE_KEY) {
-        updateUI();
-    }
-});
-
 // Modify loadURLs function for immediate loading
 function loadURLs() {
     try {
@@ -488,15 +486,6 @@ function importFromExcel(event) {
     
     reader.readAsText(file);
 }
-
-// Load URLs when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    startLine: 15
-    endLine: 54
-    
-    // Add this new event listener
-    window.addEventListener('storage', handleStorageChange);
-});
 
 function showNotification(message, type = 'info') {
     const container = document.getElementById('notification-container');
