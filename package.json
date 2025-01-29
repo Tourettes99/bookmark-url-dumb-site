@@ -1,23 +1,24 @@
 {
   "dependencies": {
-    "pusher": "^5.0.0",
-    "pusher-js": "^8.0.0",
     "exceljs": "^4.3.0",
-    "firebase": "^9.0.0"
+    "firebase": "^9.0.0",
+    "pusher": "^5.0.0",
+    "pusher-js": "^8.0.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "cross-env": "^7.0.3",
     "dotenv-webpack": "^8.0.1",
-    "webpack": "^5.88.0",
-    "webpack-cli": "^5.1.4",
     "jest": "^29.0.0",
     "puppeteer": "^21.0.0",
     "pusher-js-mock": "^0.3.8",
-    "@types/jest": "^29.0.0"
+    "webpack": "^5.88.0",
+    "webpack-cli": "^5.1.4"
   },
   "scripts": {
     "build": "webpack --mode production",
     "dev": "webpack --mode development --watch",
-    "test": "jest --detectOpenHandles",
-    "test:watch": "jest --watch"
+    "test": "cross-env CHROME_BIN=\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" jest --detectOpenHandles",
+    "test:watch": "cross-env CHROME_BIN=\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" jest --watch"
   }
-} 
+}

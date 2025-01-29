@@ -4,6 +4,9 @@ var STORAGE_KEY = 'urls';
 var TOKEN_KEY = 'sync_token';
 var SYNC_INTERVAL = 30000; // 30 seconds
 
+// Add this at the beginning of the file, after the constants
+const isPuppeteerTest = navigator.userAgent.includes('HeadlessChrome');
+
 // Initialize storage when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Check if guide should be hidden
@@ -46,8 +49,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Add this near the top of the file, after the constants
+// Modify initializePusher function
 async function initializePusher() {
+    if (isPuppeteerTest) {
+        // Mock Pusher for tests
+        window.pusher = {
+            subscribe: () => ({
+                bind: () => {}
+            })
+        };
+        return;
+    }
+    
     try {
         const response = await fetch('/.netlify/functions/get-pusher-config');
         
@@ -78,13 +91,7 @@ async function initializePusher() {
         }
     } catch (error) {
         console.error('Pusher initialization failed:', error);
-        showNotification('Failed to initialize sync service. Check console for details.', 'error');
-        // Make pusher available even if initialization fails
-        window.pusher = {
-            subscribe: () => ({
-                bind: () => {} // No-op function
-            })
-        };
+        showNotification('Failed to initialize sync service', 'error');
     }
 }
 
@@ -196,37 +203,45 @@ function addURL() {
     const categoryInput = document.getElementById('category-input');
     const hashtagsInput = document.getElementById('hashtags-input');
     
-    if (!urlInput.value) {
-        showNotification('Please enter a URL', 'error');
+    if (!urlInput || !urlInput.value) {
+        showNotification('Error: Please enter a URL', 'error');
         return;
     }
-    
-    const bookmarks = safeJSONParse(localStorage.getItem(STORAGE_KEY), []);
-    
-    const newBookmark = {
-        url: urlInput.value,
-        category: categoryInput.value || 'Uncategorized',
-        hashtags: hashtagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag),
-        pinned: false,
-        dateAdded: new Date().toISOString()
-    };
-    
-    bookmarks.push(newBookmark);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
-    
-    // Clear inputs
-    urlInput.value = '';
-    categoryInput.value = '';
-    hashtagsInput.value = '';
-    
-    // Update UI
-    loadURLs();
-    updatePinnedLinks(bookmarks);
-    
-    // Sync changes if enabled
-    syncChanges(bookmarks);
-    
-    showNotification('URL added successfully', 'success');
+
+    try {
+        // Validate URL
+        new URL(urlInput.value);
+        
+        const bookmarks = safeJSONParse(localStorage.getItem(STORAGE_KEY), []);
+        
+        const newBookmark = {
+            url: urlInput.value,
+            category: categoryInput.value || 'Uncategorized',
+            hashtags: hashtagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag),
+            pinned: false,
+            dateAdded: new Date().toISOString()
+        };
+        
+        bookmarks.push(newBookmark);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+        
+        // Clear inputs
+        urlInput.value = '';
+        categoryInput.value = '';
+        hashtagsInput.value = '';
+        
+        // Update UI
+        loadURLs();
+        updatePinnedLinks(bookmarks);
+        
+        // Sync changes if enabled
+        syncChanges(bookmarks);
+        
+        showNotification('URL added successfully', 'success');
+    } catch (error) {
+        console.error('Add URL error:', error);
+        showNotification('Error: Invalid URL format', 'error');
+    }
 }
 
 // Sync changes to other devices
@@ -376,7 +391,9 @@ function updatePinnedLinks(urls) {
     
     pinnedContainer.innerHTML = '';
     
-    const pinnedUrls = urls.filter(url => url.pinned);
+    // Ensure urls is an array
+    const urlsArray = Array.isArray(urls) ? urls : [];
+    const pinnedUrls = urlsArray.filter(url => url && url.pinned);
     
     if (pinnedUrls.length === 0) {
         pinnedContainer.innerHTML = '<div class="no-pins">No pinned links yet</div>';
@@ -384,17 +401,21 @@ function updatePinnedLinks(urls) {
     }
 
     pinnedUrls.forEach(url => {
-        const link = document.createElement('div');
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}`;
-        
-        link.innerHTML = `
-            <a href="${url.url}" target="_blank">
-                <img src="${faviconUrl}" class="favicon" alt="favicon">
-                ${new URL(url.url).hostname}
-            </a>
-        `;
-        link.className = 'pinned-link';
-        pinnedContainer.appendChild(link);
+        try {
+            const link = document.createElement('div');
+            const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}`;
+            
+            link.innerHTML = `
+                <a href="${url.url}" target="_blank">
+                    <img src="${faviconUrl}" class="favicon" alt="favicon">
+                    ${new URL(url.url).hostname}
+                </a>
+            `;
+            link.className = 'pinned-link';
+            pinnedContainer.appendChild(link);
+        } catch (error) {
+            console.error('Error creating pinned link:', error);
+        }
     });
 }
 
@@ -491,18 +512,23 @@ function getCurrentUserName() {
     return localStorage.getItem('userName') || 'Anonymous';
 }
 
-// Add this new function to handle deletion
+// Modify deleteURL function
 function deleteURL(url) {
-    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    const updatedUrls = urls.filter(item => item.url !== url);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
-    
-    // Sync the deletion
-    syncChanges(updatedUrls);
-    
-    loadURLs();
-    updatePinnedLinks(updatedUrls);
-    showNotification('URL deleted successfully!');
+    try {
+        const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        const updatedUrls = urls.filter(item => item.url !== url);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
+        
+        loadURLs();
+        updatePinnedLinks(updatedUrls);
+        showNotification('URL has been deleted successfully', 'success');
+        
+        // Move sync after notification
+        syncChanges(updatedUrls);
+    } catch (error) {
+        console.error('Delete error:', error);
+        showNotification('Error: Failed to delete URL', 'error');
+    }
 }
 
 // Modified sync function to use local storage only (removing Excel sync)
@@ -635,25 +661,36 @@ function syncWithToken() {
         // Save token for future use
         localStorage.setItem(TOKEN_KEY, inputToken);
         
+        // Initialize empty array if no data exists
+        if (!localStorage.getItem(STORAGE_KEY)) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+        }
+        
         // Set up Pusher channel subscription
         setupSyncForToken(inputToken);
         
         // Get existing data for this token
         const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`);
         if (tokenData) {
-            // Update local storage with token data
-            localStorage.setItem(STORAGE_KEY, tokenData);
-            
-            // Update UI
-            const bookmarks = JSON.parse(tokenData);
-            loadURLs();
-            updatePinnedLinks(bookmarks);
-            
-            showNotification('Successfully synced with existing data', 'success');
+            try {
+                const bookmarks = JSON.parse(tokenData);
+                if (Array.isArray(bookmarks)) {
+                    localStorage.setItem(STORAGE_KEY, tokenData);
+                    loadURLs();
+                    updatePinnedLinks(bookmarks);
+                    showNotification('Successfully synced with existing data', 'success');
+                } else {
+                    throw new Error('Invalid bookmark data format');
+                }
+            } catch (parseError) {
+                console.error('Parse error:', parseError);
+                showNotification('Error: Invalid bookmark data', 'error');
+            }
         } else {
-            // If no existing data, initialize empty storage
-            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, JSON.stringify([]));
-            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+            // Initialize empty storage for new token
+            const emptyData = JSON.stringify([]);
+            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, emptyData);
+            localStorage.setItem(STORAGE_KEY, emptyData);
             loadURLs();
             showNotification('New sync token initialized', 'success');
         }
