@@ -408,6 +408,32 @@ button:hover {
     #notification-container {
         bottom: 140px;
     }
+
+    /* Chrome-specific adjustments for mobile */
+    @supports (-webkit-appearance:none) {
+        .sidebar {
+            height: fit-content;
+            max-height: 120px;  /* Adjust this value as needed */
+            bottom: 0;
+            padding-bottom: env(safe-area-inset-bottom, 15px); /* For newer iPhones */
+        }
+
+        #pinned-links {
+            min-height: 70px;  /* Slightly increased for Chrome */
+            height: auto;
+            display: flex;
+            align-items: center;
+            padding: 10px 8px;
+            margin-bottom: 5px;
+        }
+
+        .pinned-link {
+            min-height: 45px;  /* Slightly increased for Chrome */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    }
 }
 
 /* Keep existing styles for larger screens */
