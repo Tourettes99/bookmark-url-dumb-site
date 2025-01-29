@@ -79,6 +79,13 @@ document.addEventListener('DOMContentLoaded', function() {
             syncChanges(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
         }
     });
+
+    document.getElementById('token-input')?.addEventListener('change', async function() {
+        const token = this.value;
+        if (token) {
+            await syncWithToken();
+        }
+    });
 });
 
 // Modify initializePusher function
@@ -131,6 +138,7 @@ async function setupSyncForToken(token) {
             await initializePusher();
         }
         
+        // Unsubscribe from existing channel if any
         if (window.currentChannel) {
             window.pusher.unsubscribe(window.currentChannel);
         }
@@ -140,29 +148,24 @@ async function setupSyncForToken(token) {
         
         const channel = window.pusher.subscribe(channelName);
         
-        // Immediately fetch existing data when subscribing
-        const existingData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
-        if (existingData) {
-            try {
-                const parsedData = JSON.parse(existingData);
-                localStorage.setItem(STORAGE_KEY, existingData);
-                loadURLs();
-            } catch (error) {
-                console.error('Error parsing existing data:', error);
-            }
-        }
-        
         channel.bind('sync-update', function(data) {
             if (data.source !== getDeviceId()) {
                 handleSyncUpdate(data);
-                // Update local storage with new data
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
-                loadURLs();
             }
         });
+
+        // Perform initial data fetch
+        const existingData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
+        if (existingData) {
+            localStorage.setItem(STORAGE_KEY, existingData);
+            loadURLs();
+        }
+        
+        showNotification('Sync connection established', 'success');
     } catch (error) {
         console.error('Setup sync error:', error);
         showNotification('Failed to setup sync', 'error');
+        throw error;
     }
 }
 
@@ -800,55 +803,28 @@ function mergeBookmarks(bookmarks1, bookmarks2) {
 // Replace the existing syncWithToken function
 async function syncWithToken() {
     const inputToken = document.getElementById('token-input').value;
-    if (inputToken !== 'token_1738187844795') {
-        showNotification('Invalid test token', 'error');
+    if (!inputToken) {
+        showNotification('Please enter a sync token', 'error');
         return;
     }
 
     try {
-        // Track initial sync performance
-        const uploadMetrics = await trackSyncPerformance(inputToken, 'upload');
+        // Save token
+        localStorage.setItem(TOKEN_KEY, inputToken);
         
-        // Simulate delay for testing cross-device sync
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Setup sync for the token
+        await setupSyncForToken(inputToken);
         
-        // Track download performance
-        const downloadMetrics = await trackSyncPerformance(inputToken, 'download');
+        // Get existing data
+        const currentData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         
-        // Compare data consistency
-        const localData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        const syncData = await fetchAndMergeData(inputToken);
+        // Perform initial sync
+        await syncChanges(inputToken, currentData);
         
-        const isConsistent = JSON.stringify(localData) === JSON.stringify(syncData);
-        
-        console.log('Data Consistency Check:', {
-            consistent: isConsistent,
-            localItems: localData.length,
-            syncItems: syncData.length
-        });
-
-        if (!isConsistent) {
-            showNotification('Warning: Data inconsistency detected', 'warning');
-        }
-
-        // Update UI with performance metrics
-        const performanceReport = document.createElement('div');
-        performanceReport.className = 'performance-report';
-        performanceReport.innerHTML = `
-            <h3>Sync Performance Report</h3>
-            <p>Device Type: ${PERFORMANCE_METRICS.deviceType}</p>
-            <p>Upload Speed: ${uploadMetrics.speed.toFixed(2)} KB/s</p>
-            <p>Download Speed: ${downloadMetrics.speed.toFixed(2)} KB/s</p>
-            <p>Total Duration: ${(uploadMetrics.duration + downloadMetrics.duration).toFixed(0)}ms</p>
-            <p>Data Consistency: ${isConsistent ? '✅' : '❌'}</p>
-        `;
-
-        document.body.appendChild(performanceReport);
-        setTimeout(() => performanceReport.remove(), 5000);
-
+        showNotification('Sync setup successful', 'success');
     } catch (error) {
-        console.error('Sync test failed:', error);
-        showNotification('Sync test failed: ' + error.message, 'error');
+        console.error('Sync setup error:', error);
+        showNotification('Failed to setup sync', 'error');
     }
 }
 
