@@ -689,46 +689,81 @@ function syncWithToken() {
         localStorage.setItem(TOKEN_KEY, inputToken);
         document.cookie = `${TOKEN_KEY}=${inputToken};path=/;max-age=31536000`;
         
-        // Initialize empty array if no data exists
-        const tokenKey = `${TOKEN_STORAGE_PREFIX}${inputToken}`;
-        
-        // Try to get data from either storage
-        let existingData = localStorage.getItem(tokenKey) || getCookie(tokenKey);
-        
-        if (existingData) {
-            try {
-                const parsedData = JSON.parse(decodeURIComponent(existingData));
-                const bookmarks = Array.isArray(parsedData) ? parsedData : 
-                                (parsedData && Array.isArray(parsedData.data) ? parsedData.data : []);
-                
-                // Save to both storages
-                unifiedStorageHandler(inputToken, bookmarks);
-                
-                loadURLs();
-                updatePinnedLinks(bookmarks);
-                showNotification('Successfully synced across devices', 'success');
-            } catch (parseError) {
-                console.error('Parse error:', parseError);
-                const emptyData = [];
-                unifiedStorageHandler(inputToken, emptyData);
-                loadURLs();
-                showNotification('Started fresh sync token', 'info');
-            }
-        } else {
-            // Initialize empty storage for new token
-            const emptyData = [];
-            unifiedStorageHandler(inputToken, emptyData);
+        // Fetch and merge data from all possible sources
+        fetchAndMergeData(inputToken).then(mergedData => {
+            // Save merged data to both storages
+            unifiedStorageHandler(inputToken, mergedData);
+            
+            // Update UI
             loadURLs();
-            showNotification('New sync token initialized across devices', 'success');
-        }
-        
-        // Set up Pusher channel subscription
-        setupSyncForToken(inputToken);
+            updatePinnedLinks(mergedData);
+            
+            // Set up real-time sync
+            setupSyncForToken(inputToken);
+            
+            showNotification('Successfully synced across devices', 'success');
+        }).catch(error => {
+            console.error('Fetch and merge error:', error);
+            showNotification('Sync error, trying backup data', 'warning');
+        });
         
     } catch (error) {
         console.error('Token sync error:', error);
         showNotification('Failed to sync. Please try again.', 'error');
     }
+}
+
+async function fetchAndMergeData(token) {
+    const sources = [];
+    
+    // Get data from localStorage
+    const localData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
+    if (localData) sources.push(JSON.parse(localData));
+    
+    // Get data from cookies
+    const cookieData = getCookie(`${TOKEN_STORAGE_PREFIX}${token}`);
+    if (cookieData) sources.push(JSON.parse(decodeURIComponent(cookieData)));
+    
+    // Get data from current storage
+    const currentData = localStorage.getItem(STORAGE_KEY);
+    if (currentData) sources.push(JSON.parse(currentData));
+    
+    // Merge all sources
+    let mergedData = [];
+    const urlMap = new Map();
+    
+    sources.forEach(source => {
+        if (Array.isArray(source)) {
+            source.forEach(bookmark => {
+                if (bookmark && bookmark.url) {
+                    // Keep the most recent version of each URL
+                    const existing = urlMap.get(bookmark.url);
+                    if (!existing || new Date(bookmark.dateAdded) > new Date(existing.dateAdded)) {
+                        urlMap.set(bookmark.url, bookmark);
+                    }
+                }
+            });
+        }
+    });
+    
+    mergedData = Array.from(urlMap.values());
+    
+    // Trigger sync to other devices
+    try {
+        await fetch('/.netlify/functions/sync-bookmarks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                source: getDeviceId(),
+                token: token,
+                bookmarks: mergedData
+            })
+        });
+    } catch (error) {
+        console.error('Sync to server failed:', error);
+    }
+    
+    return mergedData;
 }
 
 // Add this function to persist token across sessions
