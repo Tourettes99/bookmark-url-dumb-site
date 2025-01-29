@@ -51,6 +51,9 @@ document.addEventListener('DOMContentLoaded', function() {
         refreshButton.onclick = refreshCurrentToken;
         tokenContainer.appendChild(refreshButton);
     }
+
+    // Add this new event listener
+    window.addEventListener('storage', handleStorageChange);
 });
 
 // Modify initializePusher function
@@ -468,7 +471,11 @@ function importFromExcel(event) {
 
 // Load URLs when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    loadURLs();
+    startLine: 15
+    endLine: 54
+    
+    // Add this new event listener
+    window.addEventListener('storage', handleStorageChange);
 });
 
 function showNotification(message, type = 'info') {
@@ -658,44 +665,46 @@ function syncWithToken() {
     }
 
     try {
-        // Save token for future use
+        // Save token in both storages
         localStorage.setItem(TOKEN_KEY, inputToken);
+        document.cookie = `${TOKEN_KEY}=${inputToken};path=/;max-age=31536000`;
         
         // Initialize empty array if no data exists
-        if (!localStorage.getItem(STORAGE_KEY)) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-        }
+        const tokenKey = `${TOKEN_STORAGE_PREFIX}${inputToken}`;
         
-        // Set up Pusher channel subscription
-        setupSyncForToken(inputToken);
+        // Try to get data from either storage
+        let existingData = localStorage.getItem(tokenKey) || getCookie(tokenKey);
         
-        // Get existing data for this token
-        const tokenData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`);
-        if (tokenData) {
+        if (existingData) {
             try {
-                const parsedData = JSON.parse(tokenData);
+                const parsedData = JSON.parse(decodeURIComponent(existingData));
                 const bookmarks = Array.isArray(parsedData) ? parsedData : 
                                 (parsedData && Array.isArray(parsedData.data) ? parsedData.data : []);
                 
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+                // Save to both storages
+                unifiedStorageHandler(inputToken, bookmarks);
+                
                 loadURLs();
                 updatePinnedLinks(bookmarks);
-                showNotification('Successfully synced with existing data', 'success');
+                showNotification('Successfully synced across devices', 'success');
             } catch (parseError) {
                 console.error('Parse error:', parseError);
-                // Initialize with empty array on parse error
-                localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+                const emptyData = [];
+                unifiedStorageHandler(inputToken, emptyData);
                 loadURLs();
                 showNotification('Started fresh sync token', 'info');
             }
         } else {
             // Initialize empty storage for new token
-            const emptyData = JSON.stringify([]);
-            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${inputToken}`, emptyData);
-            localStorage.setItem(STORAGE_KEY, emptyData);
+            const emptyData = [];
+            unifiedStorageHandler(inputToken, emptyData);
             loadURLs();
-            showNotification('New sync token initialized', 'success');
+            showNotification('New sync token initialized across devices', 'success');
         }
+        
+        // Set up Pusher channel subscription
+        setupSyncForToken(inputToken);
+        
     } catch (error) {
         console.error('Token sync error:', error);
         showNotification('Failed to sync. Please try again.', 'error');
@@ -817,21 +826,25 @@ function getCookie(name) {
 }
 
 // Add this helper function for unified storage handling
-function syncStorages(token, data) {
+function unifiedStorageHandler(token, data) {
     const tokenKey = `${TOKEN_STORAGE_PREFIX}${token}`;
     const dataString = JSON.stringify(data);
     
     // Browser Storage
-    localStorage.setItem(STORAGE_KEY, dataString);
-    localStorage.setItem(tokenKey, dataString);
-    
-    // Cookie Storage
-    if (getCookie('cookie_consent') === 'accepted') {
-        setCookie(tokenKey, dataString, 30); // 30 days expiry
-        setCookie(STORAGE_KEY, dataString, 30);
+    try {
+        localStorage.setItem(STORAGE_KEY, dataString);
+        localStorage.setItem(tokenKey, dataString);
+    } catch (e) {
+        console.error('LocalStorage error:', e);
     }
     
-    return true;
+    // Cookie Storage
+    try {
+        document.cookie = `${STORAGE_KEY}=${encodeURIComponent(dataString)};path=/;max-age=31536000`;
+        document.cookie = `${tokenKey}=${encodeURIComponent(dataString)};path=/;max-age=31536000`;
+    } catch (e) {
+        console.error('Cookie storage error:', e);
+    }
 }
 
 // Add this function to handle sync conflicts
@@ -868,7 +881,7 @@ function versionedSync(token, data) {
     };
     
     localStorage.setItem(`${token}_version`, version.toString());
-    return syncStorages(token, syncData);
+    return unifiedStorageHandler(token, syncData);
 }
 
 function validateStorage(token) {
@@ -948,3 +961,21 @@ setInterval(() => {
         showNotification('Local storage is not available', 'error');
     }
 }, 300000); // Every 5 minutes
+
+function handleStorageChange(event) {
+    if (!event.key || !event.newValue) return;
+    
+    const currentToken = localStorage.getItem(TOKEN_KEY) || getCookie(TOKEN_KEY);
+    if (!currentToken) return;
+    
+    if (event.key === STORAGE_KEY || event.key === `${TOKEN_STORAGE_PREFIX}${currentToken}`) {
+        try {
+            const newData = JSON.parse(event.newValue);
+            unifiedStorageHandler(currentToken, newData);
+            loadURLs();
+            updatePinnedLinks(newData);
+        } catch (error) {
+            console.error('Storage sync error:', error);
+        }
+    }
+}
