@@ -18,22 +18,44 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('search-input')?.addEventListener('input', searchLinks);
 });
 
-// Initialize Pusher
-const pusher = new Pusher('your-pusher-key', {
-    cluster: 'your-cluster',
-    encrypted: true
-});
-
-const channel = pusher.subscribe('bookmarks-sync');
-
-// Listen for changes from other devices
-channel.bind('sync-update', function(data) {
-    if (data.source !== getDeviceId()) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
-        loadURLs();
-        updatePinnedLinks(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []);
+// Add this near the top of the file, after the constants
+async function initializePusher() {
+    try {
+        const response = await fetch('/.netlify/functions/get-pusher-config');
+        const config = await response.json();
+        
+        window.PUSHER_KEY = config.key;
+        window.PUSHER_CLUSTER = config.cluster;
+        
+        // Initialize Pusher with fetched credentials
+        window.pusher = new Pusher(PUSHER_KEY, {
+            cluster: PUSHER_CLUSTER,
+            encrypted: true
+        });
+        
+        // Set up channel subscription after initialization
+        const channel = pusher.subscribe('bookmarks-sync');
+        setupPusherListeners(channel);
+        
+    } catch (error) {
+        console.error('Failed to initialize Pusher:', error);
+        showNotification('Failed to initialize sync service', 'error');
     }
-});
+}
+
+// Separate function for Pusher event listeners
+function setupPusherListeners(channel) {
+    channel.bind('sync-update', function(data) {
+        if (data.source !== getDeviceId()) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
+            loadURLs();
+            updatePinnedLinks(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []);
+        }
+    });
+}
+
+// Call this when the page loads
+document.addEventListener('DOMContentLoaded', initializePusher);
 
 // Generate unique device ID
 function getDeviceId() {
@@ -81,9 +103,6 @@ function syncChanges(bookmarks) {
     const userToken = localStorage.getItem(TOKEN_KEY);
     if (!userToken) return;
 
-    const storageKey = TOKEN_STORAGE_PREFIX + userToken;
-    localStorage.setItem(storageKey, JSON.stringify(bookmarks));
-    
     fetch('/.netlify/functions/sync-bookmarks', {
         method: 'POST',
         headers: {
@@ -439,18 +458,40 @@ function syncWithToken() {
     }
 
     try {
-        const newStorageKey = TOKEN_STORAGE_PREFIX + inputToken;
+        // Subscribe to a private channel for this token
+        const channel = pusher.subscribe(`sync-channel-${inputToken}`);
+        
+        // Store token
         localStorage.setItem(TOKEN_KEY, inputToken);
-        localStorage.setItem(STORAGE_KEY, localStorage.getItem(newStorageKey) || '[]');
         
-        // Update UI
-        loadURLs();
-        showNotification('Data synced successfully', 'success');
-        
-        // Clear input
-        document.getElementById('token-input').value = '';
+        // Listen for updates from other devices
+        channel.bind('sync-update', function(data) {
+            if (data.source !== getDeviceId()) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
+                loadURLs();
+                updatePinnedLinks(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []);
+                showNotification('Synced with other devices', 'success');
+            }
+        });
+
+        // Send current bookmarks to other devices
+        const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        fetch('/.netlify/functions/sync-bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                source: getDeviceId(),
+                token: inputToken,
+                bookmarks: bookmarks
+            })
+        });
+
+        showNotification('Sync enabled successfully', 'success');
         
     } catch (error) {
-        showNotification('Failed to sync data', 'error');
+        console.error('Sync error:', error);
+        showNotification('Failed to enable sync', 'error');
     }
 } 
