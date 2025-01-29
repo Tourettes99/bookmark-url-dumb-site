@@ -1,5 +1,8 @@
 // Constants
 const STORAGE_KEY = 'teachmode_bookmarks';
+const SYNC_INTERVAL = 30000; // 30 seconds
+const TOKEN_KEY = 'teachmode_user_token';
+const TOKEN_STORAGE_PREFIX = 'teachmode_data_';
 
 // Initialize storage when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -75,6 +78,12 @@ function addURL() {
 
 // Sync changes to other devices
 function syncChanges(bookmarks) {
+    const userToken = localStorage.getItem(TOKEN_KEY);
+    if (!userToken) return;
+
+    const storageKey = TOKEN_STORAGE_PREFIX + userToken;
+    localStorage.setItem(storageKey, JSON.stringify(bookmarks));
+    
     fetch('/.netlify/functions/sync-bookmarks', {
         method: 'POST',
         headers: {
@@ -82,6 +91,7 @@ function syncChanges(bookmarks) {
         },
         body: JSON.stringify({
             source: getDeviceId(),
+            token: userToken,
             bookmarks: bookmarks
         })
     });
@@ -347,4 +357,103 @@ function deleteURL(url) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
     loadURLs();
     showNotification('URL deleted successfully!');
+}
+
+// Function to sync with Excel file
+async function syncWithExcel() {
+    try {
+        const bookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        
+        // Send data to Netlify function
+        const response = await fetch('/.netlify/functions/sync-excel', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                bookmarks: bookmarks,
+                timestamp: new Date().toISOString()
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Sync failed');
+        }
+
+        // Get latest data from server
+        const latestData = await fetch('/.netlify/functions/get-excel-data');
+        const jsonData = await latestData.json();
+        
+        // Update local storage with server data
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(jsonData.bookmarks));
+        
+        // Update UI
+        loadURLs();
+        updatePinnedLinks(jsonData.bookmarks);
+        
+    } catch (error) {
+        console.error('Sync error:', error);
+    }
+}
+
+// Start sync interval
+setInterval(syncWithExcel, SYNC_INTERVAL);
+
+// Sync immediately when page loads
+document.addEventListener('DOMContentLoaded', syncWithExcel);
+
+// Generate a unique token for the user
+function generateToken() {
+    const token = 'TMD_' + Math.random().toString(36).substring(2, 15) + 
+                 Math.random().toString(36).substring(2, 15);
+    
+    // Save current data with the new token
+    const currentData = localStorage.getItem(STORAGE_KEY);
+    if (currentData) {
+        localStorage.setItem(TOKEN_STORAGE_PREFIX + token, currentData);
+    }
+    
+    // Show token to user
+    showNotification({
+        url: token,
+        category: 'Copy this token to sync your data across devices'
+    });
+    
+    localStorage.setItem(TOKEN_KEY, token);
+    return token;
+}
+
+// Sync data using a token
+async function syncWithToken() {
+    const inputToken = document.getElementById('token-input').value;
+    if (!inputToken) {
+        showNotification({
+            url: 'Error',
+            category: 'Please enter a sync token'
+        });
+        return;
+    }
+
+    try {
+        // Update local storage key to use token-specific storage
+        const newStorageKey = TOKEN_STORAGE_PREFIX + inputToken;
+        localStorage.setItem(TOKEN_KEY, inputToken);
+        localStorage.setItem(STORAGE_KEY, localStorage.getItem(newStorageKey) || '[]');
+        
+        // Update UI
+        loadURLs();
+        showNotification({
+            url: 'Success',
+            category: 'Data synced successfully'
+        });
+        
+        // Clear input
+        document.getElementById('token-input').value = '';
+        
+    } catch (error) {
+        showNotification({
+            url: 'Error',
+            category: 'Failed to sync data'
+        });
+    }
 } 

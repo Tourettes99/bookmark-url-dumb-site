@@ -562,3 +562,34 @@ button:hover {
     border-radius: 4px;
     font-size: 0.9em;
 }
+
+.token-section {
+    background-color: rgba(255, 92, 40, 0.1);
+    border: 1px solid var(--orange);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.token-button {
+    background-color: var(--orange);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+}
+
+#token-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px;
+    border: 1px solid var(--orange);
+    border-radius: 4px;
+    background-color: #111;
+    color: var(--text-gray);
+}
