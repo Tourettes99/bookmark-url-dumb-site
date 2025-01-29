@@ -19,12 +19,17 @@ exports.handler = async function(event, context) {
         // Trigger update on the token-specific channel
         await pusher.trigger(`sync-channel-${data.token}`, 'sync-update', {
             source: data.source,
-            bookmarks: data.bookmarks
+            bookmarks: data.bookmarks,
+            timestamp: Date.now(),
+            broadcast: true
         });
 
         return {
             statusCode: 200,
-            body: JSON.stringify({ message: 'Sync successful' })
+            body: JSON.stringify({ 
+                message: 'Sync successful',
+                timestamp: Date.now()
+            })
         };
     } catch (error) {
         console.error('Sync error:', error);

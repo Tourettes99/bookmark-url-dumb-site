@@ -287,6 +287,9 @@ async function syncChanges(token, bookmarks) {
 
         updateSyncProgress(20, 'Preparing data...');
         
+        // Get device identifier
+        const deviceId = getDeviceId();
+        
         const response = await fetch('/.netlify/functions/sync-bookmarks', {
             method: 'POST',
             headers: {
@@ -296,8 +299,9 @@ async function syncChanges(token, bookmarks) {
             body: JSON.stringify({
                 token: token,
                 bookmarks: bookmarks,
-                source: getDeviceId(),
-                timestamp: Date.now()
+                source: deviceId,
+                timestamp: Date.now(),
+                broadcast: true  // Add this flag to ensure all devices receive the update
             }),
             signal: controller.signal
         });
@@ -316,24 +320,61 @@ async function syncChanges(token, bookmarks) {
             throw new Error(data?.error || 'Invalid response from server');
         }
 
+        // Update local storage
         localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(bookmarks));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+        
+        // Update UI
+        loadURLs();
+        updatePinnedLinks(bookmarks);
+        
         updateSyncProgress(100, 'Sync successful!', SYNC_STATES.COMPLETED);
         
         return data;
     } catch (error) {
-        if (error.name === 'AbortError') {
-            updateSyncProgress(100, 'Sync timeout', SYNC_STATES.ERROR);
-        } else if (!navigator.onLine) {
-            updateSyncProgress(100, 'No internet connection', SYNC_STATES.ERROR);
-            window.addEventListener('online', () => {
-                updateSyncProgress(0, 'Retrying sync...', SYNC_STATES.RETRYING);
-                syncChanges(token, bookmarks);
-            }, { once: true });
-        } else {
-            updateSyncProgress(100, 'Sync failed', SYNC_STATES.ERROR);
-        }
-        
+        handleSyncError(error, token, bookmarks);
         throw error;
+    }
+}
+
+// Add this helper function for error handling
+function handleSyncError(error, token, bookmarks) {
+    if (error.name === 'AbortError') {
+        updateSyncProgress(100, 'Sync timeout', SYNC_STATES.ERROR);
+    } else if (!navigator.onLine) {
+        updateSyncProgress(100, 'No internet connection', SYNC_STATES.ERROR);
+        window.addEventListener('online', () => {
+            updateSyncProgress(0, 'Retrying sync...', SYNC_STATES.RETRYING);
+            syncChanges(token, bookmarks);
+        }, { once: true });
+    } else {
+        updateSyncProgress(100, 'Sync failed', SYNC_STATES.ERROR);
+    }
+}
+
+// Modify the handleSyncUpdate function
+function handleSyncUpdate(data) {
+    try {
+        if (!data || !data.bookmarks) return;
+        
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) return;
+
+        // Update both storages regardless of source
+        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(data.bookmarks));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
+        
+        // Update UI
+        loadURLs();
+        updatePinnedLinks(data.bookmarks);
+        
+        // Show sync notification
+        showNotification('Synced with other devices', 'success');
+        updateSyncProgress(100, 'Sync completed', SYNC_STATES.COMPLETED);
+    } catch (error) {
+        console.error('Sync update error:', error);
+        showNotification('Failed to sync with other devices', 'error');
+        updateSyncProgress(100, 'Sync failed', SYNC_STATES.ERROR);
     }
 }
 
@@ -1071,27 +1112,6 @@ function handleStorageChange(event) {
         } catch (error) {
             console.error('Storage sync error:', error);
         }
-    }
-}
-
-function handleSyncUpdate(data) {
-    try {
-        if (!data || !data.bookmarks) return;
-        
-        // Update both token storage and current storage
-        const token = localStorage.getItem(TOKEN_KEY);
-        if (token) {
-            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, JSON.stringify(data.bookmarks));
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.bookmarks));
-            
-            // Update UI
-            loadURLs();
-            updatePinnedLinks(data.bookmarks);
-            showNotification('Synced with other devices', 'success');
-        }
-    } catch (error) {
-        console.error('Sync update error:', error);
-        showNotification('Failed to sync with other devices', 'error');
     }
 }
 
