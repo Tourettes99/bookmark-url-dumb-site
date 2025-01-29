@@ -343,27 +343,27 @@ button:hover {
     .sidebar {
         position: fixed;
         left: 0;
-        width: 100%;
-        height: auto;
-        max-height: 120px;
-        background-color: #111;
-        border-right: none;
-        border-top: 2px solid var(--orange);
+        right: 0;
         bottom: 0;
-        padding: 15px;
-        z-index: 100;
+        background-color: #111;
+        border-top: 2px solid var(--orange);
+        padding: 12px 15px;
+        z-index: 1000;
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
     }
 
     .sidebar h2 {
-        font-size: 1.2em;
-        margin-bottom: 10px;
-        text-align: left;
+        font-size: 0.9em;
+        color: var(--orange);
+        margin-bottom: 8px;
+        opacity: 0.9;
+        font-weight: 500;
     }
 
     .main-content {
         margin-left: 0;
-        margin-bottom: 130px;
-        padding: 15px;
+        margin-bottom: 100px;
+        padding-bottom: 20px;
     }
 
     h1 {
@@ -432,21 +432,45 @@ button:hover {
         display: flex;
         overflow-x: auto;
         gap: 10px;
-        padding-bottom: 5px;
+        padding-bottom: 4px;
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE/Edge */
+    }
+
+    #pinned-links::-webkit-scrollbar {
+        display: none; /* Chrome/Safari/Opera */
     }
 
     .pinned-link {
-        flex-shrink: 0;
-        background-color: #111;
-        padding: 8px 12px;
-        margin: 0;
+        background-color: #000;
         border: 1px solid var(--orange);
-        border-radius: 8px;
+        border-radius: 6px;
+        padding: 6px 12px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
     }
 
-    .pinned-link:hover {
-        transform: none;
-        background-color: rgba(255, 92, 40, 0.1);
+    .pinned-link:active {
+        background-color: rgba(255, 87, 34, 0.15);
+        transform: scale(0.98);
+    }
+
+    .pinned-link a {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-gray);
+        text-decoration: none;
+        font-size: 0.9em;
+    }
+
+    .pinned-link .favicon {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
     }
 
     .hashtags {
@@ -462,7 +486,7 @@ button:hover {
     }
 
     #notification-container {
-        bottom: 130px;
+        bottom: 90px;
     }
 
     .notification {
