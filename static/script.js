@@ -1156,3 +1156,57 @@ async function trackSyncPerformance(token, operation) {
         throw error;
     }
 }
+
+async function addURLAndSync() {
+    try {
+        // First add the URL
+        const urlInput = document.getElementById('url-input');
+        const categoryInput = document.getElementById('category-input');
+        const hashtagsInput = document.getElementById('hashtags-input');
+        
+        if (!urlInput || !urlInput.value) {
+            showNotification('Please enter a URL', 'error');
+            return;
+        }
+
+        // Validate URL
+        new URL(urlInput.value);
+        
+        const newUrl = {
+            url: urlInput.value,
+            category: categoryInput.value || 'Uncategorized',
+            hashtags: hashtagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag),
+            pinned: false,
+            dateAdded: new Date().toISOString()
+        };
+        
+        // Get existing URLs
+        let urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        if (!Array.isArray(urls)) urls = [];
+        
+        urls.push(newUrl);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
+        
+        // Clear inputs
+        urlInput.value = '';
+        categoryInput.value = '';
+        hashtagsInput.value = '';
+        
+        // Update displays
+        displayURLs(urls);
+        updatePinnedLinks(urls);
+        
+        // Perform sync
+        const currentToken = localStorage.getItem(TOKEN_KEY);
+        if (currentToken) {
+            await syncChanges(currentToken, urls);
+            showNotification('URL added and synced successfully!', 'success');
+        } else {
+            showNotification('URL added successfully! (No sync token set)', 'info');
+        }
+        
+    } catch (error) {
+        console.error('Add and sync error:', error);
+        showNotification('Error: Failed to add or sync URL', 'error');
+    }
+}

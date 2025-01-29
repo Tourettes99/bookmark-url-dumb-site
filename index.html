@@ -64,7 +64,7 @@
                         <li>Paste it in the "Enter URL" box</li>
                         <li>Give it a group name (like "Games" or "Videos")</li>
                         <li>Add some #tags if you want</li>
-                        <li>Click the "Add URL" button - Done! 🎉</li>
+                        <li>Click "Add & Sync URL" - It saves and syncs automatically! 🎉</li>
                     </ol>
                 </div>
                 
@@ -107,7 +107,7 @@
             <button onclick="generateToken()" class="token-button" id="generate-token-btn" name="generate-token-btn">Generate Sync Token</button>
             <input type="text" id="token-input" name="token-input" placeholder="Enter sync token" autocomplete="off">
             <div class="token-actions">
-                <button onclick="syncWithToken()" class="token-button" id="save-token-btn" name="save-token-btn">Save Data</button>
+                <button onclick="syncWithToken()" class="token-button" id="sync-token-btn" name="sync-token-btn">Sync Data</button>
                 <button onclick="refreshCurrentToken()" class="token-button refresh-token-btn" id="refresh-token-btn" name="refresh-token-btn">🔄 Refresh</button>
             </div>
         </div>
@@ -116,7 +116,7 @@
             <input type="text" id="url-input" name="url-input" placeholder="Enter URL" autocomplete="url">
             <input type="text" id="category-input" name="category-input" placeholder="Category" autocomplete="off">
             <input type="text" id="hashtags-input" name="hashtags-input" placeholder="Hashtags (comma-separated)" autocomplete="off">
-            <button onclick="addURL()" id="add-url-btn" name="add-url-btn">Add URL</button>
+            <button onclick="addURLAndSync()" id="add-sync-btn" name="add-sync-btn">Add & Sync URL</button>
         </div>
 
         <div class="search-section">
