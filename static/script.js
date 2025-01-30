@@ -1344,3 +1344,34 @@ async function handleEmptyStateSync(token) {
         showNotification('Failed to sync empty state', 'error');
     }
 }
+
+async function validateAndPreSync() {
+    try {
+        const currentToken = localStorage.getItem(TOKEN_KEY);
+        if (!currentToken) return;
+
+        // Check token storage state
+        const tokenStorage = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`);
+        const mainStorage = localStorage.getItem(STORAGE_KEY);
+
+        // Validate and prepare data
+        const tokenData = tokenStorage ? JSON.parse(tokenStorage) : [];
+        const mainData = mainStorage ? JSON.parse(mainStorage) : [];
+
+        // Ensure data consistency
+        if (JSON.stringify(tokenData) !== JSON.stringify(mainData)) {
+            // Use the most recent data
+            const mergedData = [...new Set([...tokenData, ...mainData])];
+            
+            // Update both storages
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedData));
+            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(mergedData));
+            
+            // Sync the validated state
+            await syncChanges(currentToken, mergedData);
+        }
+    } catch (error) {
+        console.error('Pre-sync validation error:', error);
+        showNotification('Error validating sync state', 'error');
+    }
+}
