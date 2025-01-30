@@ -708,58 +708,60 @@ function getCurrentUserName() {
 // Modify deleteURL function
 async function deleteURL(url) {
     try {
-        // Get current token
         const currentToken = localStorage.getItem(TOKEN_KEY);
         if (!currentToken) {
             showNotification('No sync token found', 'error');
             return;
         }
 
-        // Get device identifier
         const deviceId = getDeviceId();
-        
-        // Get and update URLs
         const urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         const updatedUrls = urls.filter(item => item.url !== url);
         
-        // Update both storages immediately
+        // Check if this was the last URL
+        if (updatedUrls.length === 0) {
+            // Create empty state like token generation
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+            localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify([]));
+            
+            // Update UI for empty state
+            displayURLs([]);
+            updatePinnedLinks([]);
+            
+            // Sync empty state
+            await fetch('/.netlify/functions/sync-bookmarks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
+                },
+                body: JSON.stringify({
+                    token: currentToken,
+                    bookmarks: [],
+                    source: deviceId,
+                    timestamp: Date.now(),
+                    broadcast: true,
+                    operation: 'clear'
+                })
+            });
+            
+            showNotification('All bookmarks deleted and synced', 'success');
+            return;
+        }
+        
+        // Normal delete operation for non-empty state
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
         localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(updatedUrls));
         
-        // Update UI immediately
         displayURLs(updatedUrls);
         updatePinnedLinks(updatedUrls);
 
-        // Use Pusher to broadcast the change
-        const response = await fetch('/.netlify/functions/sync-bookmarks', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache'
-            },
-            body: JSON.stringify({
-                token: currentToken,
-                bookmarks: updatedUrls,
-                source: deviceId,
-                timestamp: Date.now(),
-                broadcast: true,
-                operation: 'delete',
-                url: url  // Include the specific URL being deleted
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Sync failed');
-        }
-
-        // Update sync progress
-        updateSyncProgress(100, 'Delete synced successfully', SYNC_STATES.COMPLETED);
+        await syncChanges(currentToken, updatedUrls);
         showNotification('URL deleted and synced successfully', 'success');
 
     } catch (error) {
         console.error('Delete error:', error);
         showNotification('Failed to delete URL', 'error');
-        updateSyncProgress(100, 'Sync failed', SYNC_STATES.ERROR);
     }
 }
 
