@@ -707,77 +707,64 @@ function getCurrentUserName() {
 
 // Modify deleteURL function
 async function deleteURL(url) {
-    const logError = (stage, error) => {
-        console.error(`Delete URL Error [${stage}]:`, {
-            url: url,
-            error: error.message,
-            stack: error.stack,
-            timestamp: new Date().toISOString(),
-            deviceId: getDeviceId()
-        });
-    };
-
     try {
-        // Get current token first
+        // Get current token and validate
         const currentToken = localStorage.getItem(TOKEN_KEY);
         if (!currentToken) {
-            logError('TOKEN_CHECK', new Error('No sync token found'));
             showNotification('No sync token found', 'error');
             return;
         }
 
-        // Validate URL
-        try {
-            new URL(url);
-        } catch (urlError) {
-            logError('URL_VALIDATION', urlError);
-            showNotification('Invalid URL format', 'error');
-            return;
-        }
+        // Track sync performance
+        const metrics = {
+            timestamp: Date.now(),
+            operation: 'delete',
+            startTime: performance.now()
+        };
 
         // Get and update URLs
-        let urls;
-        try {
-            urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            if (!Array.isArray(urls)) {
-                throw new Error('Stored URLs is not an array');
-            }
-        } catch (parseError) {
-            logError('PARSE_STORAGE', parseError);
-            urls = [];
-        }
-
+        const urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         const updatedUrls = urls.filter(item => item.url !== url);
         
-        // Update local storage
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
-        } catch (storageError) {
-            logError('UPDATE_STORAGE', storageError);
-            showNotification('Failed to update local storage', 'error');
-            return;
-        }
+        // Update all storage locations
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
+        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(updatedUrls));
         
-        // Update UI
-        try {
-            displayURLs(updatedUrls);
-            updatePinnedLinks(updatedUrls);
-        } catch (uiError) {
-            logError('UPDATE_UI', uiError);
-            showNotification('UI update failed', 'error');
-        }
+        // Update UI immediately
+        displayURLs(updatedUrls);
+        updatePinnedLinks(updatedUrls);
 
-        // Sync changes
-        try {
-            await syncChanges(currentToken, updatedUrls);
+        // Add to sync queue for reliable syncing
+        syncQueue.add(async () => {
+            const response = await fetch('/.netlify/functions/sync-bookmarks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
+                },
+                body: JSON.stringify({
+                    token: currentToken,
+                    bookmarks: updatedUrls,
+                    source: getDeviceId(),
+                    timestamp: Date.now(),
+                    broadcast: true,
+                    operation: 'delete'
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Sync failed');
+            }
+
+            metrics.endTime = performance.now();
+            metrics.duration = metrics.endTime - metrics.startTime;
+            console.log('Delete sync performance:', metrics);
+
             showNotification('URL deleted and synced successfully', 'success');
-        } catch (syncError) {
-            logError('SYNC', syncError);
-            showNotification('URL deleted locally but sync failed', 'error');
-        }
+        });
 
     } catch (error) {
-        logError('GENERAL', error);
+        console.error('Delete operation failed:', error);
         showNotification('Failed to delete URL', 'error');
     }
 }
