@@ -418,30 +418,30 @@ function handleSyncUpdate(data) {
 // Modified togglePin function to include sync
 function togglePin(url) {
     try {
+        // Get current token first
+        const currentToken = localStorage.getItem(TOKEN_KEY);
+        if (!currentToken) {
+            showNotification('No sync token found', 'error');
+            return;
+        }
+
         const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
         const urlIndex = urls.findIndex(item => item.url === url);
         
         if (urlIndex !== -1) {
-            // Toggle the pin status
             urls[urlIndex].pinned = !urls[urlIndex].pinned;
-            
-            // Update local storage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
             
             // Update UI immediately
             displayURLs(urls);
             updatePinnedLinks(urls);
             
-            // Get current token and sync changes
-            const currentToken = localStorage.getItem(TOKEN_KEY);
-            if (currentToken) {
-                syncChanges(currentToken, urls).catch(error => {
-                    console.error('Sync error after pin toggle:', error);
-                    showNotification('Pin status saved locally but sync failed', 'error');
-                });
-            }
+            // Sync changes with proper parameters
+            syncChanges(currentToken, urls).catch(error => {
+                console.error('Sync error after pin toggle:', error);
+                showNotification('Pin status saved locally but sync failed', 'error');
+            });
             
-            // Show success notification
             const pinStatus = urls[urlIndex].pinned ? 'pinned' : 'unpinned';
             showNotification(`URL ${pinStatus} successfully`, 'success');
         }
@@ -708,33 +708,30 @@ function getCurrentUserName() {
 // Modify deleteURL function
 async function deleteURL(url) {
     try {
-        // Get current token
+        // Get current token first
         const currentToken = localStorage.getItem(TOKEN_KEY);
         if (!currentToken) {
             showNotification('No sync token found', 'error');
             return;
         }
 
-        // Get and update URLs
         const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
         const updatedUrls = urls.filter(item => item.url !== url);
         
         // Update local storage
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
         
-        // Update UI first for better user experience
+        // Update UI immediately
         displayURLs(updatedUrls);
         updatePinnedLinks(updatedUrls);
         
-        // Sync changes using the same pattern as addURLAndSync
-        try {
-            await syncChanges(currentToken, updatedUrls);
-            showNotification('URL deleted and synced successfully', 'success');
-        } catch (syncError) {
-            console.error('Sync error after deletion:', syncError);
+        // Sync changes with proper parameters
+        syncChanges(currentToken, updatedUrls).catch(error => {
+            console.error('Sync error after deletion:', error);
             showNotification('URL deleted locally but sync failed', 'error');
-        }
-
+        });
+        
+        showNotification('URL deleted successfully', 'success');
     } catch (error) {
         console.error('Delete error:', error);
         showNotification('Failed to delete URL', 'error');
