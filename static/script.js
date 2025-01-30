@@ -445,17 +445,27 @@ function updateUI() {
 // Modify loadURLs function for immediate loading
 function loadURLs() {
     try {
-        // Get data from storage with default empty array
-        const urls = localStorage.getItem(STORAGE_KEY) || '[]';
-        const parsedUrls = JSON.parse(urls);
+        // Get data from storage with proper null check and default value
+        const urls = localStorage.getItem(STORAGE_KEY);
+        let parsedUrls = [];
+        
+        if (urls) {
+            try {
+                parsedUrls = JSON.parse(urls);
+            } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+                // If parsing fails, use empty array
+                parsedUrls = [];
+            }
+        }
         
         // Ensure we have an array
         if (!Array.isArray(parsedUrls)) {
-            localStorage.setItem(STORAGE_KEY, '[]');
-            displayURLs([]);
-            updatePinnedLinks([]);
-            return;
+            parsedUrls = [];
         }
+        
+        // Update storage with valid data
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsedUrls));
         
         // Update both displays
         displayURLs(parsedUrls);
