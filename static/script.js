@@ -150,15 +150,22 @@ async function setupSyncForToken(token) {
         
         channel.bind('sync-update', function(data) {
             if (data.source !== getDeviceId()) {
-                handleSyncUpdate(data);
+                // Force immediate update when receiving sync data
+                requestAnimationFrame(() => {
+                    handleSyncUpdate(data);
+                });
             }
         });
 
-        // Perform initial data fetch
+        // Perform initial data fetch and render
         const existingData = localStorage.getItem(`${TOKEN_STORAGE_PREFIX}${token}`);
         if (existingData) {
+            const bookmarks = JSON.parse(existingData);
             localStorage.setItem(STORAGE_KEY, existingData);
-            loadURLs();
+            requestAnimationFrame(() => {
+                displayURLs(bookmarks);
+                updatePinnedLinks(bookmarks);
+            });
         }
         
         showNotification('Sync connection established', 'success');
@@ -363,14 +370,14 @@ function handleSyncUpdate(data) {
         const token = localStorage.getItem(TOKEN_KEY);
         if (!token) return;
 
-        // Merge existing and new bookmarks to prevent duplicates
+        // Merge existing and new bookmarks
         const existingBookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         const newBookmarks = data.bookmarks;
         
-        // Create a map of URLs to detect duplicates
+        // Create a map of URLs for efficient lookup
         const urlMap = new Map();
         
-        // Add existing bookmarks to map (keeping the most recent version)
+        // Add existing bookmarks to map
         existingBookmarks.forEach(bookmark => {
             if (bookmark && bookmark.url) {
                 urlMap.set(bookmark.url, bookmark);
@@ -380,27 +387,24 @@ function handleSyncUpdate(data) {
         // Update or add new bookmarks
         newBookmarks.forEach(bookmark => {
             if (bookmark && bookmark.url) {
-                const existing = urlMap.get(bookmark.url);
-                if (!existing || new Date(bookmark.dateAdded) > new Date(existing.dateAdded)) {
-                    urlMap.set(bookmark.url, bookmark);
-                }
+                urlMap.set(bookmark.url, bookmark);
             }
         });
         
-        // Convert map back to array
-        const mergedBookmarks = Array.from(urlMap.values());
+        // Convert map back to array and sort by date
+        const mergedBookmarks = Array.from(urlMap.values())
+            .sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
         
-        // Sort by date added (newest first)
-        mergedBookmarks.sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
-        
-        // Update both storages
+        // Update both storages with stringified data
         const bookmarksString = JSON.stringify(mergedBookmarks);
         localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${token}`, bookmarksString);
         localStorage.setItem(STORAGE_KEY, bookmarksString);
         
-        // Update UI
-        displayURLs(mergedBookmarks);
-        updatePinnedLinks(mergedBookmarks);
+        // Force UI update on all devices
+        requestAnimationFrame(() => {
+            displayURLs(mergedBookmarks);
+            updatePinnedLinks(mergedBookmarks);
+        });
         
         showNotification('Synced with other devices', 'success');
         updateSyncProgress(100, 'Sync completed', SYNC_STATES.COMPLETED);
