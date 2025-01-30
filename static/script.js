@@ -418,11 +418,14 @@ function togglePin(url) {
         const urlIndex = urls.findIndex(item => item.url === url);
         
         if (urlIndex !== -1) {
+            // Toggle the pin status
             urls[urlIndex].pinned = !urls[urlIndex].pinned;
+            
+            // Update local storage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
             
-            // Update UI first
-            loadURLs();
+            // Update UI immediately
+            displayURLs(urls);
             updatePinnedLinks(urls);
             
             // Get current token and sync changes
@@ -430,18 +433,17 @@ function togglePin(url) {
             if (currentToken) {
                 syncChanges(currentToken, urls).catch(error => {
                     console.error('Sync error after pin toggle:', error);
-                    showNotification('Changes saved locally but sync failed', 'error');
+                    showNotification('Pin status saved locally but sync failed', 'error');
                 });
             }
             
-            showNotification(
-                urls[urlIndex].pinned ? 'URL pinned successfully' : 'URL unpinned successfully',
-                'success'
-            );
+            // Show success notification
+            const pinStatus = urls[urlIndex].pinned ? 'pinned' : 'unpinned';
+            showNotification(`URL ${pinStatus} successfully`, 'success');
         }
     } catch (error) {
         console.error('Pin toggle error:', error);
-        showNotification('Error: Failed to update pin status', 'error');
+        showNotification('Failed to update pin status', 'error');
     }
 }
 
@@ -573,38 +575,41 @@ function createURLElement(urlData) {
 
 function updatePinnedLinks(urls) {
     const pinnedContainer = document.getElementById('pinned-links');
-    if (!pinnedContainer) {
-        console.error('Pinned links container not found!');
-        return;
-    }
-    
+    if (!pinnedContainer) return;
+
+    // Clear existing content
     pinnedContainer.innerHTML = '';
-    
-    // Ensure urls is an array
-    const urlsArray = Array.isArray(urls) ? urls : [];
-    const pinnedUrls = urlsArray.filter(url => url && url.pinned);
-    
+
+    // Filter and sort pinned URLs
+    const pinnedUrls = urls.filter(url => url.pinned)
+                          .sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
+
     if (pinnedUrls.length === 0) {
-        pinnedContainer.innerHTML = '<div class="no-pins">No pinned links yet</div>';
+        pinnedContainer.innerHTML = '<div class="empty-state">No pinned URLs</div>';
         return;
     }
 
+    // Create elements for each pinned URL
     pinnedUrls.forEach(url => {
-        try {
-            const link = document.createElement('div');
-            const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}`;
-            
-            link.innerHTML = `
-                <a href="${url.url}" target="_blank">
-                    <img src="${faviconUrl}" class="favicon" alt="favicon">
-                    ${new URL(url.url).hostname}
-                </a>
-            `;
-            link.className = 'pinned-link';
-            pinnedContainer.appendChild(link);
-        } catch (error) {
-            console.error('Error creating pinned link:', error);
-        }
+        const div = document.createElement('div');
+        div.className = 'pinned-url-card';
+        
+        const link = document.createElement('a');
+        link.href = url.url;
+        link.target = '_blank';
+        link.textContent = url.url;
+        
+        const unpinButton = document.createElement('button');
+        unpinButton.className = 'unpin-button';
+        unpinButton.onclick = (e) => {
+            e.preventDefault();
+            togglePin(url.url);
+        };
+        unpinButton.innerHTML = '📌'; // Pin icon
+        
+        div.appendChild(link);
+        div.appendChild(unpinButton);
+        pinnedContainer.appendChild(div);
     });
 }
 
@@ -701,12 +706,13 @@ function deleteURL(url) {
     try {
         const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
         const updatedUrls = urls.filter(item => item.url !== url);
+        
+        // Update local storage first
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
         
-        // Update UI first
-        loadURLs();
+        // Update UI
+        displayURLs(updatedUrls);
         updatePinnedLinks(updatedUrls);
-        showNotification('URL has been deleted successfully', 'success');
         
         // Get current token and sync changes
         const currentToken = localStorage.getItem(TOKEN_KEY);
@@ -716,9 +722,11 @@ function deleteURL(url) {
                 showNotification('Changes saved locally but sync failed', 'error');
             });
         }
+        
+        showNotification('URL deleted successfully', 'success');
     } catch (error) {
         console.error('Delete error:', error);
-        showNotification('Error: Failed to delete URL', 'error');
+        showNotification('Failed to delete URL', 'error');
     }
 }
 
