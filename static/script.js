@@ -413,19 +413,35 @@ function handleSyncUpdate(data) {
 
 // Modified togglePin function to include sync
 function togglePin(url) {
-    const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    const urlIndex = urls.findIndex(item => item.url === url);
-    
-    if (urlIndex !== -1) {
-        urls[urlIndex].pinned = !urls[urlIndex].pinned;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
+    try {
+        const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        const urlIndex = urls.findIndex(item => item.url === url);
         
-        // Sync changes
-        syncChanges(urls);
-        
-        // Update UI
-        loadURLs();
-        updatePinnedLinks(urls);
+        if (urlIndex !== -1) {
+            urls[urlIndex].pinned = !urls[urlIndex].pinned;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(urls));
+            
+            // Update UI first
+            loadURLs();
+            updatePinnedLinks(urls);
+            
+            // Get current token and sync changes
+            const currentToken = localStorage.getItem(TOKEN_KEY);
+            if (currentToken) {
+                syncChanges(currentToken, urls).catch(error => {
+                    console.error('Sync error after pin toggle:', error);
+                    showNotification('Changes saved locally but sync failed', 'error');
+                });
+            }
+            
+            showNotification(
+                urls[urlIndex].pinned ? 'URL pinned successfully' : 'URL unpinned successfully',
+                'success'
+            );
+        }
+    } catch (error) {
+        console.error('Pin toggle error:', error);
+        showNotification('Error: Failed to update pin status', 'error');
     }
 }
 
@@ -687,12 +703,19 @@ function deleteURL(url) {
         const updatedUrls = urls.filter(item => item.url !== url);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
         
+        // Update UI first
         loadURLs();
         updatePinnedLinks(updatedUrls);
         showNotification('URL has been deleted successfully', 'success');
         
-        // Move sync after notification
-        syncChanges(updatedUrls);
+        // Get current token and sync changes
+        const currentToken = localStorage.getItem(TOKEN_KEY);
+        if (currentToken) {
+            syncChanges(currentToken, updatedUrls).catch(error => {
+                console.error('Sync error after delete:', error);
+                showNotification('Changes saved locally but sync failed', 'error');
+            });
+        }
     } catch (error) {
         console.error('Delete error:', error);
         showNotification('Error: Failed to delete URL', 'error');
