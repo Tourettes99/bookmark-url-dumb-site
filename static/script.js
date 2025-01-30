@@ -1312,3 +1312,39 @@ function updateSyncProgress(progress, status, state = SYNC_STATES.IN_PROGRESS) {
         }
     }
 }
+
+async function handleEmptyTokenSync(token) {
+    try {
+        // Get current token and validate
+        const currentToken = localStorage.getItem(TOKEN_KEY);
+        if (!currentToken) {
+            showNotification('No sync token found', 'error');
+            return;
+        }
+
+        // Get existing URLs
+        const storedUrls = localStorage.getItem(STORAGE_KEY) || '[]';
+        let urls = JSON.parse(storedUrls);
+        if (!Array.isArray(urls)) urls = [];
+        
+        // Clear token storage
+        localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify([]));
+        
+        // Update UI
+        displayURLs([]);
+        updatePinnedLinks([]);
+        
+        // Sync empty state
+        if (currentToken) {
+            await syncChanges(currentToken, []);
+            showNotification('Empty state synced successfully!', 'success');
+        }
+        
+        // Re-setup sync for token
+        await setupSyncForToken(currentToken);
+        
+    } catch (error) {
+        console.error('Empty sync error:', error);
+        showNotification('Failed to sync empty state', 'error');
+    }
+}
