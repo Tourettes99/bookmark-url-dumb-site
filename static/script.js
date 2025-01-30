@@ -726,12 +726,9 @@ async function deleteURL(url) {
         updatePinnedLinks(updatedUrls);
         
         // Sync changes with proper parameters
-        syncChanges(currentToken, updatedUrls).catch(error => {
-            console.error('Sync error after deletion:', error);
-            showNotification('URL deleted locally but sync failed', 'error');
-        });
+        await syncChanges(currentToken, updatedUrls);
+        showNotification('URL deleted and synced successfully', 'success');
         
-        showNotification('URL deleted successfully', 'success');
     } catch (error) {
         console.error('Delete error:', error);
         showNotification('Failed to delete URL', 'error');
