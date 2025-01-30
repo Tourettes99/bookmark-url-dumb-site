@@ -714,46 +714,33 @@ async function deleteURL(url) {
             return;
         }
 
-        const deviceId = getDeviceId();
-        const urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        // Get existing URLs with default empty array
+        const storedUrls = localStorage.getItem(STORAGE_KEY) || '[]';
+        let urls = JSON.parse(storedUrls);
+        if (!Array.isArray(urls)) urls = [];
+        
+        // Filter out the deleted URL
         const updatedUrls = urls.filter(item => item.url !== url);
         
-        // Update both storages immediately
+        // Update both storages (same as addURLAndSync)
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
         localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(updatedUrls));
         
-        // Update UI
+        // Update displays (same pattern as addURLAndSync)
         displayURLs(updatedUrls);
         updatePinnedLinks(updatedUrls);
-
-        // Sync deletion to server
-        const response = await fetch('/.netlify/functions/sync-bookmarks', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache'
-            },
-            body: JSON.stringify({
-                token: currentToken,
-                bookmarks: updatedUrls,
-                source: deviceId,
-                timestamp: Date.now(),
-                broadcast: true,
-                operation: 'delete'
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Sync failed');
-        }
-
-        showNotification('URL deleted and synced successfully', 'success');
-    } catch (error) {
-        console.error('Delete error:', error);
-        showNotification('Failed to delete URL', 'error');
         
-        // Attempt to restore state on error
-        loadURLs();
+        // Perform sync (same as addURLAndSync)
+        if (currentToken) {
+            await syncChanges(currentToken, updatedUrls);
+            showNotification('URL deleted and synced successfully!', 'success');
+        } else {
+            showNotification('URL deleted successfully! (No sync token set)', 'info');
+        }
+        
+    } catch (error) {
+        console.error('Delete and sync error:', error);
+        showNotification('Error: Failed to delete or sync URL', 'error');
     }
 }
 
