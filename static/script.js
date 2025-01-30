@@ -714,24 +714,46 @@ async function deleteURL(url) {
             return;
         }
 
+        const deviceId = getDeviceId();
         const urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         const updatedUrls = urls.filter(item => item.url !== url);
         
-        // Update local storage
+        // Update both storages immediately
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
         localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(updatedUrls));
         
-        // Update UI immediately
+        // Update UI
         displayURLs(updatedUrls);
         updatePinnedLinks(updatedUrls);
 
-        // Use the same sync pattern as addURLAndSync
-        await syncChanges(currentToken, updatedUrls);
-        showNotification('URL deleted and synced successfully', 'success');
+        // Sync deletion to server
+        const response = await fetch('/.netlify/functions/sync-bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+            },
+            body: JSON.stringify({
+                token: currentToken,
+                bookmarks: updatedUrls,
+                source: deviceId,
+                timestamp: Date.now(),
+                broadcast: true,
+                operation: 'delete'
+            })
+        });
 
+        if (!response.ok) {
+            throw new Error('Sync failed');
+        }
+
+        showNotification('URL deleted and synced successfully', 'success');
     } catch (error) {
         console.error('Delete error:', error);
         showNotification('Failed to delete URL', 'error');
+        
+        // Attempt to restore state on error
+        loadURLs();
     }
 }
 
