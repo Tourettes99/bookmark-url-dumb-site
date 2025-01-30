@@ -707,55 +707,77 @@ function getCurrentUserName() {
 
 // Modify deleteURL function
 async function deleteURL(url) {
+    const logError = (stage, error) => {
+        console.error(`Delete URL Error [${stage}]:`, {
+            url: url,
+            error: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString(),
+            deviceId: getDeviceId()
+        });
+    };
+
     try {
         // Get current token first
         const currentToken = localStorage.getItem(TOKEN_KEY);
         if (!currentToken) {
+            logError('TOKEN_CHECK', new Error('No sync token found'));
             showNotification('No sync token found', 'error');
             return;
         }
 
-        // Get device identifier for sync
-        const deviceId = getDeviceId();
-        
-        const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+        // Validate URL
+        try {
+            new URL(url);
+        } catch (urlError) {
+            logError('URL_VALIDATION', urlError);
+            showNotification('Invalid URL format', 'error');
+            return;
+        }
+
+        // Get and update URLs
+        let urls;
+        try {
+            urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            if (!Array.isArray(urls)) {
+                throw new Error('Stored URLs is not an array');
+            }
+        } catch (parseError) {
+            logError('PARSE_STORAGE', parseError);
+            urls = [];
+        }
+
         const updatedUrls = urls.filter(item => item.url !== url);
         
         // Update local storage
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
-        
-        // Update UI immediately
-        displayURLs(updatedUrls);
-        updatePinnedLinks(updatedUrls);
-
-        // Trigger sync with same pattern as addURLAndSync
         try {
-            const response = await fetch('/.netlify/functions/sync-bookmarks', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Cache-Control': 'no-cache'
-                },
-                body: JSON.stringify({
-                    token: currentToken,
-                    bookmarks: updatedUrls,
-                    source: deviceId,
-                    timestamp: Date.now(),
-                    broadcast: true
-                })
-            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
+        } catch (storageError) {
+            logError('UPDATE_STORAGE', storageError);
+            showNotification('Failed to update local storage', 'error');
+            return;
+        }
+        
+        // Update UI
+        try {
+            displayURLs(updatedUrls);
+            updatePinnedLinks(updatedUrls);
+        } catch (uiError) {
+            logError('UPDATE_UI', uiError);
+            showNotification('UI update failed', 'error');
+        }
 
-            if (!response.ok) {
-                throw new Error('Sync failed');
-            }
-
+        // Sync changes
+        try {
+            await syncChanges(currentToken, updatedUrls);
             showNotification('URL deleted and synced successfully', 'success');
         } catch (syncError) {
-            console.error('Sync error after deletion:', syncError);
+            logError('SYNC', syncError);
             showNotification('URL deleted locally but sync failed', 'error');
         }
+
     } catch (error) {
-        console.error('Delete error:', error);
+        logError('GENERAL', error);
         showNotification('Failed to delete URL', 'error');
     }
 }
