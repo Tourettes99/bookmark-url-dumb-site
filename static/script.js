@@ -708,25 +708,16 @@ function getCurrentUserName() {
 // Modify deleteURL function
 async function deleteURL(url) {
     try {
-        // Get current token and validate
         const currentToken = localStorage.getItem(TOKEN_KEY);
         if (!currentToken) {
             showNotification('No sync token found', 'error');
             return;
         }
 
-        // Track sync performance
-        const metrics = {
-            timestamp: Date.now(),
-            operation: 'delete',
-            startTime: performance.now()
-        };
-
-        // Get and update URLs
         const urls = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         const updatedUrls = urls.filter(item => item.url !== url);
         
-        // Update all storage locations
+        // Update local storage
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
         localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify(updatedUrls));
         
@@ -734,37 +725,12 @@ async function deleteURL(url) {
         displayURLs(updatedUrls);
         updatePinnedLinks(updatedUrls);
 
-        // Add to sync queue for reliable syncing
-        syncQueue.add(async () => {
-            const response = await fetch('/.netlify/functions/sync-bookmarks', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Cache-Control': 'no-cache'
-                },
-                body: JSON.stringify({
-                    token: currentToken,
-                    bookmarks: updatedUrls,
-                    source: getDeviceId(),
-                    timestamp: Date.now(),
-                    broadcast: true,
-                    operation: 'delete'
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Sync failed');
-            }
-
-            metrics.endTime = performance.now();
-            metrics.duration = metrics.endTime - metrics.startTime;
-            console.log('Delete sync performance:', metrics);
-
-            showNotification('URL deleted and synced successfully', 'success');
-        });
+        // Use the same sync pattern as addURLAndSync
+        await syncChanges(currentToken, updatedUrls);
+        showNotification('URL deleted and synced successfully', 'success');
 
     } catch (error) {
-        console.error('Delete operation failed:', error);
+        console.error('Delete error:', error);
         showNotification('Failed to delete URL', 'error');
     }
 }
