@@ -702,28 +702,35 @@ function getCurrentUserName() {
 }
 
 // Modify deleteURL function
-function deleteURL(url) {
+async function deleteURL(url) {
     try {
+        // Get current token
+        const currentToken = localStorage.getItem(TOKEN_KEY);
+        if (!currentToken) {
+            showNotification('No sync token found', 'error');
+            return;
+        }
+
+        // Get and update URLs
         const urls = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
         const updatedUrls = urls.filter(item => item.url !== url);
         
-        // Update local storage first
+        // Update local storage
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUrls));
         
-        // Update UI
+        // Update UI first for better user experience
         displayURLs(updatedUrls);
         updatePinnedLinks(updatedUrls);
         
-        // Get current token and sync changes
-        const currentToken = localStorage.getItem(TOKEN_KEY);
-        if (currentToken) {
-            syncChanges(currentToken, updatedUrls).catch(error => {
-                console.error('Sync error after delete:', error);
-                showNotification('Changes saved locally but sync failed', 'error');
-            });
+        // Sync changes using the same pattern as addURLAndSync
+        try {
+            await syncChanges(currentToken, updatedUrls);
+            showNotification('URL deleted and synced successfully', 'success');
+        } catch (syncError) {
+            console.error('Sync error after deletion:', syncError);
+            showNotification('URL deleted locally but sync failed', 'error');
         }
-        
-        showNotification('URL deleted successfully', 'success');
+
     } catch (error) {
         console.error('Delete error:', error);
         showNotification('Failed to delete URL', 'error');
