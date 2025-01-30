@@ -1313,38 +1313,34 @@ function updateSyncProgress(progress, status, state = SYNC_STATES.IN_PROGRESS) {
     }
 }
 
-async function handleEmptyTokenSync(token) {
+async function handleEmptyStateSync(token) {
     try {
-        // Get current token and validate
-        const currentToken = localStorage.getItem(TOKEN_KEY);
+        // Get current token
+        const currentToken = token || localStorage.getItem(TOKEN_KEY);
         if (!currentToken) {
             showNotification('No sync token found', 'error');
             return;
         }
 
-        // Get existing URLs
-        const storedUrls = localStorage.getItem(STORAGE_KEY) || '[]';
-        let urls = JSON.parse(storedUrls);
-        if (!Array.isArray(urls)) urls = [];
-        
-        // Clear token storage
+        // Clear both storage locations
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
         localStorage.setItem(`${TOKEN_STORAGE_PREFIX}${currentToken}`, JSON.stringify([]));
         
-        // Update UI
+        // Update UI to show empty state
         displayURLs([]);
         updatePinnedLinks([]);
         
-        // Sync empty state
-        if (currentToken) {
-            await syncChanges(currentToken, []);
-            showNotification('Empty state synced successfully!', 'success');
-        }
+        // Sync empty state to other devices
+        await syncChanges(currentToken, []);
         
-        // Re-setup sync for token
+        // Show empty state notification
+        showNotification('Empty state synced successfully', 'success');
+        
+        // Re-setup sync for token to ensure proper state
         await setupSyncForToken(currentToken);
         
     } catch (error) {
-        console.error('Empty sync error:', error);
+        console.error('Empty state sync error:', error);
         showNotification('Failed to sync empty state', 'error');
     }
 }
