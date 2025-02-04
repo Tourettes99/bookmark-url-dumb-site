@@ -2,10 +2,10 @@
   command = "CI=false npm install && npm run build"
   publish = "build"
   functions = "netlify/functions"
-  ignore = "pip install -r requirements.txt"
 
 [build.environment]
-  SKIP_PYTHON_INSTALL = "true"
+  SKIP_PYTHON = "true"
+  NODE_VERSION = "18"
 
 [dev]
   command = "npm start"
