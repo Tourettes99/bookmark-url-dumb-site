@@ -1,11 +1,18 @@
 [build]
-  command = "CI=false npm install && npm run build"
+  command = "bash ./netlify/build.sh"
   publish = "build"
   functions = "netlify/functions"
 
 [build.environment]
-  SKIP_PYTHON = "true"
   NODE_VERSION = "18"
+  PYTHON_VERSION = "false"
+  NETLIFY_USE_PYTHON = "false"
+  SKIP_PYTHON = "true"
+  SKIP_PYTHON_SETUP = "1"
+  CI = "false"
+
+[functions]
+  node_bundler = "esbuild"
 
 [dev]
   command = "npm start"
