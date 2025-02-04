@@ -46,6 +46,7 @@ function App() {
   const [urls, setUrls] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState(null);
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const handleDrawerToggle = () => {
@@ -70,19 +71,39 @@ function App() {
       }
 
       setLoading(true);
+      setServerError(null);
       try {
+        // Try local server first
+        try {
+          const localResponse = await fetch(`http://localhost:5000/api/urls?token=${token}`);
+          const data = await localResponse.json();
+          if (Array.isArray(data)) {
+            setUrls(data);
+            setServerError(null);
+            setLoading(false);
+            return;
+          }
+        } catch (localError) {
+          console.log('Local server not available');
+        }
+
+        // Fallback to Netlify function
         const response = await fetch(`/.netlify/functions/getUrls?token=${token}`);
-        if (!response.ok) throw new Error('Failed to fetch URLs');
-        
         const data = await response.json();
-        if (Array.isArray(data)) {
+        
+        if (data.isNetlify) {
+          setServerError('Database server is offline. Please contact the site owner.');
+          setUrls([]);
+        } else if (Array.isArray(data)) {
           setUrls(data);
+          setServerError(null);
         } else if (data.error) {
-          console.error('Error fetching URLs:', data.error);
+          setServerError(data.error);
           setUrls([]);
         }
       } catch (error) {
         console.error('Error fetching URLs:', error);
+        setServerError('Failed to connect to the database server');
         setUrls([]);
       } finally {
         setLoading(false);
@@ -201,6 +222,20 @@ function App() {
                   </ol>
                 </Typography>
               </Box>
+
+              {serverError && (
+                <Box sx={{ 
+                  mb: 4, 
+                  p: 2, 
+                  borderRadius: 1,
+                  border: '1px solid #ff0000',
+                  backgroundColor: 'rgba(255, 0, 0, 0.1)'
+                }}>
+                  <Typography color="error">
+                    {serverError}
+                  </Typography>
+                </Box>
+              )}
 
               <TokenGenerator token={token} setToken={setToken} />
               <UrlForm token={token} urls={urls} setUrls={setUrls} />
