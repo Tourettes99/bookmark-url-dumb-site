@@ -37,64 +37,19 @@ exports.handler = async (event, context) => {
       };
     }
 
-    return new Promise((resolve, reject) => {
-      const pythonProcess = spawn('python', [
-        path.join(__dirname, '../../excel_handler.py'),
-        'save',
-        token,
-        JSON.stringify(urlData)
-      ]);
-
-      let dataString = '';
-      let errorString = '';
-
-      pythonProcess.stdout.on('data', (data) => {
-        dataString += data.toString();
-      });
-
-      pythonProcess.stderr.on('data', (data) => {
-        errorString += data.toString();
-      });
-
-      pythonProcess.on('close', (code) => {
-        if (code !== 0 || errorString) {
-          console.error('Python script error:', errorString);
-          resolve({
-            statusCode: 500,
-            headers: {
-              'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify({ 
-              error: 'Failed to save URL',
-              details: errorString
-            })
-          });
-        } else {
-          try {
-            const result = JSON.parse(dataString);
-            resolve({
-              statusCode: 200,
-              headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(result)
-            });
-          } catch (e) {
-            resolve({
-              statusCode: 500,
-              headers: {
-                'Access-Control-Allow-Origin': '*'
-              },
-              body: JSON.stringify({ 
-                error: 'Invalid response from Python script',
-                details: dataString
-              })
-            });
-          }
-        }
-      });
-    });
+    // Return a mock response when running on Netlify
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: 'Please run the local server (python local_server.py) to save URLs',
+        isNetlify: true,
+        success: false
+      })
+    };
   } catch (error) {
     console.error('Error in saveUrl function:', error);
     return {
